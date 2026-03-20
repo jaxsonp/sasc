@@ -1,0 +1,58 @@
+program = top_level_decl* ;
+
+top_level_decl = function_definition
+               | let_stmt ;
+
+function_definition = "fn", ident, "(", arg_definition_list, ")", [ "->", type ], block ;
+
+arg_definition_list = [ arg_definition, { ",", arg_definition } ] ;
+
+arg_definition = ident, ":", type ;
+
+block = "{", { stmt }, [ expr ], "}" ;
+
+(* Statements *)
+stmt = let_stmt
+     | return_stmt
+     | assignment_stmt
+     | if_expr (* if used as statement, no semicolon *)
+     | block (* block as statement, no semicolon *)
+     | expr, ";" ; (* other expressions need semicolon *)
+
+let_stmt = "let", ident, ":", type, "=", expr, ";" ;
+
+return_stmt = "return", [ expr ], ";" ;
+
+assignment_stmt = expr, "=", expr, ";" ;
+
+if_expr = "if", expr, block, { "elif", expr, block }, [ "else", block ] ;
+
+(* Expression precedence *)
+expr = logical_or ;
+
+logical_or = logical_and, { "||", logical_and } ;
+logical_and = equality, { "&&", equality } ;
+equality = comparison, { ("==" | "!="), comparison } ;
+comparison = additive, { ("<" | ">" | "<=" | ">="), additive } ;
+additive = multiplicative, { ("+" | "-"), multiplicative } ;
+multiplicative = unary, { ("*" | "/"), unary } ;
+
+unary = ("-" | "!"), unary
+      | postfix ;
+
+postfix = primary, { postfix_op } ;
+
+postfix_op = "(", [ arg_list ], ")" (* function call *)
+           | "[", expr, "]" ; (* array indexing *)
+
+primary = ident
+        | literal
+        | if_expr (* if as expression *)
+        | block (* block as expression *)
+        | "(", expr, ")" ;
+
+arg_list = expr, { ",", expr } ;
+
+type = type_ident, [ "<", type, ">" ] ;
+
+type_ident = "void" | "addr" | "bool" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" ;

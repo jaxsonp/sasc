@@ -1,0 +1,134 @@
+#pragma once
+
+#include <variant>
+#include <vector>
+#include <optional>
+#include <memory>
+
+#include "Lexer.hpp"
+#include "types.hpp"
+#include "common.hpp"
+
+// AST nodes stuff
+namespace ast
+{
+
+	// Node interface
+	class Node
+	{
+	public:
+		SourceLoc src_start;
+		SourceLoc src_end;
+
+		virtual ~Node() = default;
+	};
+
+	// AST node types
+	namespace node_types
+	{
+
+		struct IntegerLiteral : Node
+		{
+			// TODO parse this
+			std::string value;
+
+			static std::optional<IntegerLiteral> try_parse(Lexer &lexer);
+
+		private:
+			IntegerLiteral(std::string value_) : value(value_) {}
+		};
+
+		struct Expression : Node
+		{
+			std::variant<IntegerLiteral> variant;
+
+			static std::optional<Expression> try_parse(Lexer &lexer);
+
+		private:
+			Expression(IntegerLiteral int_lit) : variant(int_lit) {}
+		};
+
+		struct ReturnStatement : Node
+		{
+			std::optional<Expression> expr;
+
+			static std::optional<ReturnStatement> try_parse(Lexer &lexer);
+
+		private:
+			ReturnStatement() : expr() {};
+			ReturnStatement(Expression expr_) : expr(expr_) {};
+		};
+
+		struct Statement : Node
+		{
+			std::variant<ReturnStatement> variant;
+
+			static std::optional<Statement> try_parse(Lexer &lexer);
+
+		private:
+			Statement(ReturnStatement stmt) : variant(stmt) {};
+		};
+
+		struct Block : Node
+		{
+			std::vector<Statement> statements;
+			std::optional<Expression> expression;
+
+			static std::optional<Block> try_parse(Lexer &lexer);
+		};
+
+		struct ArgDefinition : Node
+		{
+			std::string type;
+			std::string name;
+
+			static std::optional<ArgDefinition> try_parse(Lexer &lexer);
+		};
+
+		struct FunctionDefinition : Node
+		{
+			std::string name;
+			std::vector<ArgDefinition> args;
+			std::string return_type;
+			Block block;
+
+			static std::optional<FunctionDefinition> try_parse(Lexer &lexer);
+
+		private:
+			FunctionDefinition(std::string name_, std::vector<ArgDefinition> args_, std::string return_type_, Block block_)
+				: name(name_),
+				  args(args_), return_type(return_type_), block(block_) {}
+		};
+
+		struct TopLevelDeclaration : Node
+		{
+			std::variant<FunctionDefinition> variant;
+
+			static std::optional<TopLevelDeclaration> try_parse(Lexer &lexer);
+
+		private:
+			TopLevelDeclaration(FunctionDefinition fn)
+				: variant(fn)
+			{
+				src_start = fn.src_start;
+				src_end = fn.src_end;
+			}
+		};
+
+		struct Program : Node
+		{
+			std::vector<TopLevelDeclaration> tlds;
+
+			static Program try_parse(Lexer &lexer);
+		};
+	}
+}
+
+class AST
+{
+	ast::node_types::Program program;
+
+public:
+	// attempt to create an AST from tokens
+	AST(Lexer &lexer);
+};
