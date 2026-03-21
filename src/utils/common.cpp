@@ -1,5 +1,17 @@
 #include "common.hpp"
 
+#include <format>
+
+std::string SourceLoc::to_string() const
+{
+	return std::format("{}:{}", this->line, this->col);
+}
+
+std::string SourceLocRange::to_string() const
+{
+	return std::format("{}:{}-{}:{}", this->start.line, this->start.col, this->end.line, this->end.col);
+}
+
 bool is_whitespace(char c)
 {
 	return (c >= 9 && c <= 13) || c == 32;

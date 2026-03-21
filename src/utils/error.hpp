@@ -2,20 +2,19 @@
 
 #include <exception>
 #include <string>
-#include <optional>
+#include <variant>
 
 #include "utils/common.hpp"
 
 class CompileError : public std::exception
 {
 	std::string msg;
-	std::optional<SourceLoc> src_start;
-	std::optional<SourceLoc> src_end;
+	std::variant<std::monostate, SourceLoc, SourceLocRange> loc;
 
 public:
 	CompileError(const std::string &_msg);
-	CompileError(const std::string &_msg, SourceLoc start);
-	CompileError(const std::string &_msg, SourceLoc start, SourceLoc end);
+	CompileError(const std::string &_msg, SourceLoc loc);
+	CompileError(const std::string &_msg, SourceLocRange loc);
 
 	const char *what();
 

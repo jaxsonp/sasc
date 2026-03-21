@@ -6,6 +6,16 @@ struct SourceLoc
 {
 	unsigned int line = 0;
 	unsigned int col = 0;
+
+	std::string to_string() const;
+};
+
+struct SourceLocRange
+{
+	SourceLoc start;
+	SourceLoc end;
+
+	std::string to_string() const;
 };
 
 bool is_whitespace(char c);

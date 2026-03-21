@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
 void compile(const std::string &filename)
 {
-	log_v("starting compilation");
+	log("{}: compiling...", filename);
 	std::ifstream file(filename);
 	if (!file.is_open())
 		throw std::runtime_error(std::format("Failed to open file \"{}\"", filename));
@@ -72,5 +72,5 @@ void compile(const std::string &filename)
 		ast.debug_print();
 	}
 
-	log_v("compilation complete");
+	log("{}: compilation complete", filename);
 }

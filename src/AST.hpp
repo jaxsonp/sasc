@@ -1,11 +1,39 @@
 #pragma once
 
 #include <variant>
+#include <tuple>
 #include <vector>
 #include <optional>
+#include <unordered_map>
+#include <memory>
 
 #include "Lexer.hpp"
+#include "types.hpp"
 #include "utils/common.hpp"
+
+class SymbolTable
+{
+	std::unordered_map<std::string, std::optional<FrontendType>> symbols;
+
+public:
+	/// @brief Parent (nullptr if root)
+	std::weak_ptr<SymbolTable> parent;
+	std::vector<std::shared_ptr<SymbolTable>> children;
+
+	// std::optional<Type> find_symbol(const std::string &name, bool recursive = true);
+
+	/// @brief Attempts to insert a symbol into this symbol table scope, reporting wh
+	/// @param name Symbol name
+	/// @param type Symbol type
+	/// @return Returns true if insertion was successful, false if symbol is already defined here
+	inline bool add(std::string name, FrontendType type);
+	/// @brief Attempts to insert a symbol into this symbol table scope, reporting wh
+	/// @param symbol Name/type pair
+	/// @return Returns true if insertion was successful, false if symbol is already defined here
+	bool add(std::pair<std::string, FrontendType> symbol);
+
+	SymbolTable() = default;
+};
 
 // AST nodes stuff
 namespace ast
@@ -15,141 +43,121 @@ namespace ast
 	class Node
 	{
 	public:
-		SourceLoc src_start;
-		SourceLoc src_end;
+		SourceLocRange src_loc;
 
-		virtual void debug_print(unsigned int depth) = 0;
+		virtual void check(std::shared_ptr<SymbolTable> symbols) = 0;
+		virtual void debug_print(unsigned int depth) const = 0;
 
 		virtual ~Node() = default;
+	};
+
+	// TLD interface
+	class TopLevelDeclaration : public Node
+	{
+	public:
+		virtual std::pair<std::string, FrontendType> declares() const = 0;
+
+		static std::optional<std::unique_ptr<TopLevelDeclaration>> try_parse(Lexer &lexer);
+	};
+
+	// expression interface
+	class ExpressionNode : public Node
+	{
+	public:
+		static std::optional<std::unique_ptr<ExpressionNode>> try_parse(Lexer &lexer);
+	};
+
+	// statement interface
+	class StatementNode : public Node
+	{
+	public:
+		static std::optional<std::unique_ptr<StatementNode>> try_parse(Lexer &lexer);
 	};
 
 	// AST node types
 	namespace node_types
 	{
 
-		struct IntegerLiteral : Node
+		struct IntegerLiteralExpression : ExpressionNode
 		{
 			std::string value;
-			std::string type_annotation;
+			FrontendType type;
 
-			void debug_print(unsigned int depth = 0) override;
+			void check(std::shared_ptr<SymbolTable> scope) override;
+			void debug_print(unsigned int depth = 0) const override;
 
-			static std::optional<IntegerLiteral> try_parse(Lexer &lexer);
-
-		private:
-			IntegerLiteral(const std::string &value_, const std::string &type_)
-				: value(value_), type_annotation(type_) {}
+			static std::optional<std::unique_ptr<IntegerLiteralExpression>> try_parse(Lexer &lexer);
 		};
 
-		struct Expression : Node
+		struct ReturnStatement : StatementNode
 		{
-			std::variant<IntegerLiteral> variant;
+			std::unique_ptr<ExpressionNode> expr;
 
-			void debug_print(unsigned int depth = 0) override;
+			void check(std::shared_ptr<SymbolTable> scope) override;
+			void debug_print(unsigned int depth = 0) const override;
 
-			static std::optional<Expression> try_parse(Lexer &lexer);
-
-		private:
-			Expression(IntegerLiteral int_lit) : variant(int_lit) {}
-		};
-
-		struct ReturnStatement : Node
-		{
-			std::optional<Expression> expr;
-
-			void debug_print(unsigned int depth = 0) override;
-
-			static std::optional<ReturnStatement> try_parse(Lexer &lexer);
-
-		private:
-			ReturnStatement() : expr() {};
-			ReturnStatement(Expression expr_) : expr(expr_) {};
-		};
-
-		struct Statement : Node
-		{
-			std::variant<ReturnStatement> variant;
-
-			void debug_print(unsigned int depth = 0) override;
-
-			static std::optional<Statement> try_parse(Lexer &lexer);
-
-		private:
-			Statement(ReturnStatement stmt) : variant(stmt) {};
+			static std::optional<std::unique_ptr<ReturnStatement>> try_parse(Lexer &lexer);
 		};
 
 		struct Block : Node
 		{
-			std::vector<Statement> statements;
-			std::optional<Expression> expression;
+			std::vector<std::unique_ptr<StatementNode>> statements;
+			std::unique_ptr<ExpressionNode> expression;
+			std::shared_ptr<SymbolTable> symbols;
 
-			void debug_print(unsigned int depth = 0) override;
+			void check(std::shared_ptr<SymbolTable> scope) override;
+			void debug_print(unsigned int depth = 0) const override;
 
-			static std::optional<Block> try_parse(Lexer &lexer);
+			static std::optional<std::unique_ptr<Block>> try_parse(Lexer &lexer);
 		};
 
 		struct ArgDefinition : Node
 		{
-			std::string type;
+			FrontendType type;
 			std::string name;
 
-			void debug_print(unsigned int depth = 0) override;
+			void check(std::shared_ptr<SymbolTable> scope) override;
+			void debug_print(unsigned int depth = 0) const override;
 
 			static std::optional<ArgDefinition> try_parse(Lexer &lexer);
+
+		private:
+			ArgDefinition() = default;
 		};
 
-		struct FunctionDefinition : Node
+		struct FunctionDefinition : TopLevelDeclaration
 		{
 			std::string name;
 			std::vector<ArgDefinition> args;
-			std::string return_type;
-			Block block;
+			FrontendType return_type;
+			std::string return_type_str;
+			std::unique_ptr<Block> body;
 
-			void debug_print(unsigned int depth = 0) override;
+			void check(std::shared_ptr<SymbolTable> scope) override;
+			void debug_print(unsigned int depth = 0) const override;
 
 			static std::optional<FunctionDefinition> try_parse(Lexer &lexer);
 
-		private:
-			FunctionDefinition(const std::string &name_, std::vector<ArgDefinition> args_, const std::string &return_type_, Block block_)
-				: name(name_),
-				  args(args_), return_type(return_type_), block(block_) {}
-		};
-
-		struct TopLevelDeclaration : Node
-		{
-			std::variant<FunctionDefinition> variant;
-
-			void debug_print(unsigned int depth = 0) override;
-
-			static std::optional<TopLevelDeclaration> try_parse(Lexer &lexer);
-
-		private:
-			TopLevelDeclaration(FunctionDefinition fn)
-				: variant(fn)
+			inline std::pair<std::string, FrontendType> declares() const override
 			{
-				src_start = fn.src_start;
-				src_end = fn.src_end;
+				return {this->name, this->return_type};
 			}
+
+		private:
+			FunctionDefinition() = default;
 		};
 
-		struct Program : Node
-		{
-			std::vector<TopLevelDeclaration> tlds;
-
-			void debug_print(unsigned int depth = 0) override;
-
-			static Program try_parse(Lexer &lexer);
-		};
 	}
 }
 
 class AST
 {
-	ast::node_types::Program program;
+	std::vector<std::unique_ptr<ast::TopLevelDeclaration>> tlds;
+	std::shared_ptr<SymbolTable> top_level_symbols;
 
 public:
 	// attempt to create an AST from tokens
 	AST(Lexer &lexer);
 
-	void debug_print();
+	void debug_print() const;
 };

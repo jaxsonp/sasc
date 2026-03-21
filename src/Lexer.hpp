@@ -27,17 +27,16 @@ enum class TokenType
 	ERROR_UNEXPECTED_CHAR,
 };
 
-std::string toString(TokenType type);
+std::string to_string(TokenType type);
 
 struct Token
 {
-	SourceLoc start;
-	SourceLoc end;
-	std::string token_str;
+	SourceLocRange loc;
+	std::string str;
 	TokenType type;
 };
 
-std::string toString(Token tok);
+std::string to_string(Token tok);
 
 class Lexer
 {

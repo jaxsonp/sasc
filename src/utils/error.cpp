@@ -3,18 +3,18 @@
 #include <format>
 
 CompileError::CompileError(const std::string &_msg)
-	: std::exception(), msg(_msg), src_start(), src_end() {}
+	: std::exception(), msg(_msg), loc() {}
 
-CompileError::CompileError(const std::string &_msg, SourceLoc start)
-	: std::exception(), src_start(start), src_end()
+CompileError::CompileError(const std::string &_msg, SourceLoc loc)
+	: std::exception(), loc(loc)
 {
-	this->msg = std::format("{} (at {}:{})", _msg, start.line, start.col);
+	this->msg = std::format("{} (at {}:{})", _msg, loc.line, loc.col);
 }
 
-CompileError::CompileError(const std::string &_msg, SourceLoc start, SourceLoc end)
-	: std::exception(), src_start(start), src_end(end)
+CompileError::CompileError(const std::string &_msg, SourceLocRange loc)
+	: std::exception(), loc(loc)
 {
-	this->msg = std::format("{} (at {}:{})", _msg, start.line, start.col);
+	this->msg = std::format("{} (at {}:{})", _msg, loc.start.line, loc.start.col);
 }
 
 const char *CompileError::what()

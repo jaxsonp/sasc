@@ -2,157 +2,221 @@
 
 #include <format>
 #include <iostream>
+#include <stdexcept>
+#include <utility>
 
 #include "utils/error.hpp"
+#include "utils/logging.hpp"
 
 AST::AST(Lexer &lexer)
 {
+
+	log_vv("Attempting to parse AST");
 	try
 	{
-		program = ast::node_types::Program::try_parse(lexer);
+		while (true)
+		{
+			if (auto parsed = ast::TopLevelDeclaration::try_parse(lexer))
+			{
+
+				this->tlds.push_back(std::move(parsed.value()));
+
+				continue;
+			}
+			break;
+		}
+		lexer.expect(TokenType::END_OF_FILE);
 	}
 	catch (CompileError e)
 	{
-		e.add_prefix("Error while syntax parsing: ");
+		e.add_prefix("syntax error: ");
+		throw e;
+	}
+
+	log_vv("Performing semantic analysis on AST");
+
+	// top level hoisting
+	this->top_level_symbols = std::make_shared<SymbolTable>();
+	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
+	{
+		auto [name, type] = tld->declares();
+		this->top_level_symbols->add(name, type);
+	}
+
+	try
+	{
+		for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
+		{
+			tld->check(this->top_level_symbols);
+		}
+	}
+	catch (CompileError e)
+	{
+		e.add_prefix("semantic error: ");
 		throw e;
 	}
 }
 
-void AST::debug_print()
+void AST::debug_print() const
 {
-	program.debug_print();
+	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
+	{
+		tld->debug_print(0);
+	}
+}
+
+bool SymbolTable::add(std::string name, FrontendType type)
+{
+	return this->add({name, type});
+}
+
+bool SymbolTable::add(std::pair<std::string, FrontendType> symbol)
+{
+	auto [_, success] = this->symbols.insert(symbol);
+	return success;
 }
 
 namespace ast
 {
 	namespace node_types
 	{
-		void IntegerLiteral::debug_print(unsigned int depth)
+		void IntegerLiteralExpression::check(std::shared_ptr<SymbolTable> symbols)
 		{
-			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Integer literal (value: \"" << this->value << "\", type annotation: \"" << this->type_annotation << "\")" << std::endl;
 		}
 
-		std::optional<IntegerLiteral> IntegerLiteral::try_parse(Lexer &lexer)
+		void IntegerLiteralExpression::debug_print(unsigned int depth) const
+		{
+			std::cout << std::string(depth * 2, ' ');
+			std::cout << "Integer literal expression (value: \"" << this->value << "\", type annotation: " << this->type.to_string() << ")";
+			std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
+		}
+
+		std::optional<std::unique_ptr<IntegerLiteralExpression>> IntegerLiteralExpression::try_parse(Lexer &lexer)
 		{
 			if (lexer.peek().type != TokenType::INT_LITERAL)
 				return std::nullopt;
-			std::string s = lexer.take().token_str;
+
+			auto ret = std::make_unique<IntegerLiteralExpression>();
+			Token tok = lexer.take();
+			ret->src_loc = tok.loc;
 
 			// finding where numbers stop
-			auto type_annotation_pos = s.begin();
-			while (type_annotation_pos != s.end() && is_numeric(*type_annotation_pos))
+			auto type_annotation_pos = tok.str.begin();
+			while (type_annotation_pos != tok.str.end() && is_numeric(*type_annotation_pos))
 				++type_annotation_pos;
 
-			return IntegerLiteral(
-				std::string(s.begin(), type_annotation_pos),
-				std::string(type_annotation_pos, s.end()));
+			ret->value = std::string(tok.str.begin(), type_annotation_pos);
+
+			std::string type_str(type_annotation_pos, tok.str.end());
+			ret->type = FrontendType(type_str, tok.loc);
+
+			return ret;
 		}
 
-		void Expression::debug_print(unsigned int depth)
+		void ReturnStatement::check(std::shared_ptr<SymbolTable> symbols)
 		{
-			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Expression" << std::endl;
-			if (std::holds_alternative<IntegerLiteral>(this->variant))
-				std::get<IntegerLiteral>(this->variant).debug_print(depth + 1);
-			else
-				throw std::logic_error("Unhandled expression variant");
-		}
-
-		std::optional<Expression> Expression::try_parse(Lexer &lexer)
-		{
-			if (auto int_lit = IntegerLiteral::try_parse(lexer))
+			if (this->expr != nullptr)
 			{
-				return Expression(int_lit.value());
+				this->expr->check(symbols);
 			}
-			return std::nullopt;
 		}
 
-		void ReturnStatement::debug_print(unsigned int depth)
+		void ReturnStatement::debug_print(unsigned int depth) const
 		{
 			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Return statement (expression present: " << bool_str(this->expr.has_value()) << ")" << std::endl;
-			if (this->expr.has_value())
-				this->expr.value().debug_print(depth + 1);
+			std::cout << "Return statement (expression present: " << bool_str(this->expr != nullptr) << ")";
+			std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
+			if (this->expr != nullptr)
+				this->expr->debug_print(depth + 1);
 		}
 
-		std::optional<ReturnStatement> ReturnStatement::try_parse(Lexer &lexer)
+		std::optional<std::unique_ptr<ReturnStatement>> ReturnStatement::try_parse(Lexer &lexer)
 		{
 			if (lexer.peek().type != TokenType::KEYWORD_RETURN)
 				return std::nullopt;
-			lexer.take();
+
+			auto ret = std::make_unique<ReturnStatement>();
+			ret->src_loc.start = lexer.take().loc.start;
 
 			if (lexer.peek().type == TokenType::SEMICOLON)
-				return ReturnStatement();
+				return ret;
 
-			auto expr = Expression::try_parse(lexer);
-			if (!expr.has_value())
+			if (auto parsed_expr = ExpressionNode::try_parse(lexer))
+				ret->expr = std::move(parsed_expr.value());
+			else
 				throw CompileError("Expected expression", lexer.pos);
-			lexer.expect(TokenType::SEMICOLON);
 
-			return ReturnStatement(expr.value());
+			ret->src_loc.end = lexer.expect(TokenType::SEMICOLON).loc.end;
+
+			return ret;
 		}
 
-		void Statement::debug_print(unsigned int depth)
+		void Block::check(std::shared_ptr<SymbolTable> parent_scope)
+		{
+			// new scope
+			this->symbols = std::make_shared<SymbolTable>();
+			this->symbols->parent = parent_scope;
+			parent_scope->children.push_back(this->symbols);
+
+			for (std::unique_ptr<StatementNode> &stmt : this->statements)
+			{
+				stmt->check(this->symbols);
+			}
+
+			if (this->expression != nullptr)
+				this->expression->check(this->symbols);
+		}
+
+		void Block::debug_print(unsigned int depth) const
 		{
 			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Statement" << std::endl;
-			if (std::holds_alternative<ReturnStatement>(this->variant))
-				std::get<ReturnStatement>(this->variant).debug_print(depth + 1);
-			else
-				throw std::logic_error("Unhandled statement variant");
-		}
-
-		std::optional<Statement> Statement::try_parse(Lexer &lexer)
-		{
-			if (auto return_stmt = ReturnStatement::try_parse(lexer))
-				return Statement(return_stmt.value());
-			else
-				return std::nullopt;
-		}
-
-		void Block::debug_print(unsigned int depth)
-		{
-			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Block (statements: " << this->statements.size() << ", expression present: " << bool_str(this->expression.has_value()) << ")" << std::endl;
-			for (auto &stmt : this->statements)
+			std::cout << "Block (statements: " << this->statements.size() << ", expression present: " << bool_str(this->expression != nullptr) << ")";
+			std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
+			for (const auto &stmt : this->statements)
 			{
-				stmt.debug_print(depth + 1);
+				stmt->debug_print(depth + 1);
 			}
-			if (this->expression.has_value())
-			{
-				this->expression.value().debug_print(depth + 1);
-			}
+
+			if (this->expression != nullptr)
+				this->expression->debug_print(depth + 1);
 		}
 
-		std::optional<Block> Block::try_parse(Lexer &lexer)
+		std::optional<std::unique_ptr<Block>> Block::try_parse(Lexer &lexer)
 		{
 			if (lexer.peek().type != TokenType::L_BRACKET)
 				return std::nullopt;
-			lexer.take();
 
-			Block block;
+			auto ret = std::make_unique<Block>();
+			ret->src_loc.start = lexer.take().loc.start;
+
 			while (true)
 			{
-				if (auto stmt = Statement::try_parse(lexer))
+				if (auto stmt = StatementNode::try_parse(lexer))
 				{
-					block.statements.push_back(stmt.value());
+					ret->statements.push_back(std::move(stmt.value()));
 					continue;
 				}
 				break;
 			}
-			if (auto expr = Expression::try_parse(lexer))
+			if (auto expr = ExpressionNode::try_parse(lexer))
 			{
-				block.expression = expr;
+				ret->expression = std::move(expr.value());
 			}
-			lexer.expect(TokenType::R_BRACKET);
-			return block;
+
+			ret->src_loc.end = lexer.expect(TokenType::R_BRACKET).loc.end;
+			return std::move(ret);
 		}
 
-		void ArgDefinition::debug_print(unsigned int depth)
+		void ArgDefinition::check(std::shared_ptr<SymbolTable> symbols)
+		{
+			// TODO
+		}
+
+		void ArgDefinition::debug_print(unsigned int depth) const
 		{
 			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Argument definition (type: \"" << this->type << "\", name: \"" << this->name << "\")" << std::endl;
+			std::cout << "Argument definition (type: " << this->type.to_string() << ", name: \"" << this->name << "\")";
+			std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
 		}
 
 		std::optional<ArgDefinition> ArgDefinition::try_parse(Lexer &lexer)
@@ -160,46 +224,80 @@ namespace ast
 			if (lexer.peek().type != TokenType::IDENT)
 				return std::nullopt;
 
-			Token ident = lexer.take();
+			ArgDefinition ret;
+
+			Token name_tok = lexer.take();
+			ret.name = name_tok.str;
+			ret.src_loc.start = name_tok.loc.start;
 
 			lexer.expect(TokenType::COLON);
-			// TODO
+
+			Token type_tok = lexer.expect(TokenType::IDENT);
+			ret.type = FrontendType(type_tok);
+			ret.src_loc.end = type_tok.loc.end;
+
+			return ret;
 		}
 
-		void FunctionDefinition::debug_print(unsigned int depth)
+		void FunctionDefinition::check(std::shared_ptr<SymbolTable> symbols)
+		{
+			// TODO check function name
+
+			// check return type
+			if (std::optional<FrontendType::Unknown> unknown = this->return_type.is_unknown())
+				throw CompileError(std::format("Invalid type: \"{}\"", unknown->str), unknown->loc);
+
+			// check args
+			for (ArgDefinition &arg : this->args)
+			{
+				arg.check(symbols);
+			}
+
+			// check body
+			this->body->check(symbols);
+
+			// check if body has return or expr
+			// check if return value matches
+		}
+
+		void FunctionDefinition::debug_print(unsigned int depth) const
 		{
 			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Function definition (name: \"" << this->name << "\", args: " << this->args.size() << ", return type: \"" << this->return_type << "\")" << std::endl;
-			for (ArgDefinition &arg : this->args)
+			std::cout << "Function definition (name: \"" << this->name << "\", args: " << this->args.size() << ", return type: " << this->return_type.to_string() << ")";
+			std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
+			for (const ArgDefinition &arg : this->args)
 			{
 				arg.debug_print(depth + 1);
 			}
-			this->block.debug_print(depth + 1);
+			this->body->debug_print(depth + 1);
 		}
 
 		std::optional<FunctionDefinition> FunctionDefinition::try_parse(Lexer &lexer)
 		{
+			// fn keyword
 			if (lexer.peek().type != TokenType::KEYWORD_FN)
 				return std::nullopt;
-			SourceLoc src_start = lexer.take().start;
 
+			FunctionDefinition ret;
+			ret.src_loc.start = lexer.take().loc.start;
+
+			// name
 			Token name_tok = lexer.expect(TokenType::IDENT);
-			lexer.expect(TokenType::L_PAREN);
+			ret.name = name_tok.str;
 
-			// parsing args
-			std::vector<ArgDefinition> args;
+			// args
+			lexer.expect(TokenType::L_PAREN);
 			while (true)
 			{
 				if (auto arg = ArgDefinition::try_parse(lexer))
 				{
-					args.push_back(arg.value());
-					TokenType next_type = lexer.peek().type;
-					if (next_type == TokenType::R_PAREN)
+					ret.args.push_back(arg.value());
+					if (lexer.peek().type == TokenType::R_PAREN)
 					{
 						lexer.take();
 						break;
 					}
-					else if (next_type == TokenType::COMMA)
+					else if (lexer.peek().type == TokenType::COMMA)
 					{
 						lexer.take();
 						continue;
@@ -215,64 +313,56 @@ namespace ast
 				}
 			}
 
-			// return value
-			std::string return_type("void");
+			// return type
+			ret.return_type = FrontendType(ConcreteType::VOID);
 			if (lexer.peek().type == TokenType::ARROW)
 			{
 				lexer.take();
-				return_type = lexer.expect(TokenType::IDENT).token_str;
+				ret.return_type = FrontendType(lexer.expect(TokenType::IDENT));
 			}
 
 			// must be a block here
-			auto block = Block::try_parse(lexer);
-			if (!block.has_value())
+			if (std::optional<std::unique_ptr<Block>> parsed = Block::try_parse(lexer))
+			{
+				ret.body = std::move(parsed.value());
+			}
+			else
 				throw CompileError("Expected a function body (e.g. \"{ ... }\")");
 
-			return FunctionDefinition(name_tok.token_str, args, return_type, block.value());
+			ret.src_loc.end = ret.body->src_loc.end;
+			return ret;
 		}
 
-		void TopLevelDeclaration::debug_print(unsigned int depth)
-		{
-			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Top level declaration" << std::endl;
-			if (std::holds_alternative<FunctionDefinition>(this->variant))
-				std::get<FunctionDefinition>(this->variant).debug_print(depth + 1);
-			else
-				throw std::logic_error("Unhandled tld variant");
-		}
-
-		std::optional<TopLevelDeclaration> TopLevelDeclaration::try_parse(Lexer &lexer)
-		{
-			if (auto func = FunctionDefinition::try_parse(lexer))
-			{
-				return TopLevelDeclaration(func.value());
-			}
-			else
-			{
-				return std::nullopt;
-			}
-		}
-		void Program::debug_print(unsigned int depth)
-		{
-			std::cout << std::string(depth * 2, ' ');
-			std::cout << "Program root" << std::endl;
-			for (TopLevelDeclaration &tld : this->tlds)
-			{
-				tld.debug_print(depth + 1);
-			}
-		}
-
-		Program Program::try_parse(Lexer &lexer)
-		{
-			Program program;
-			while (true)
-			{
-				if (auto tld = TopLevelDeclaration::try_parse(lexer))
-					program.tlds.push_back(tld.value());
-				else
-					break;
-			}
-			return program;
-		}
 	}
+
+	std::optional<std::unique_ptr<TopLevelDeclaration>> TopLevelDeclaration::try_parse(Lexer &lexer)
+	{
+		if (auto function_def = node_types::FunctionDefinition::try_parse(lexer))
+		{
+			auto ret = std::make_unique<node_types::FunctionDefinition>(std::move(function_def.value()));
+			ret->src_loc = function_def->src_loc;
+			return ret;
+		}
+
+		return std::nullopt;
+	}
+
+	std::optional<std::unique_ptr<ExpressionNode>> ExpressionNode::try_parse(Lexer &lexer)
+	{
+		if (auto expr = node_types::IntegerLiteralExpression::try_parse(lexer))
+		{
+			return std::move(expr.value());
+		}
+		return std::nullopt;
+	}
+
+	std::optional<std::unique_ptr<StatementNode>> StatementNode::try_parse(Lexer &lexer)
+	{
+		if (auto stmt = node_types::ReturnStatement::try_parse(lexer))
+		{
+			return std::move(stmt.value());
+		}
+		return std::nullopt;
+	}
+
 }

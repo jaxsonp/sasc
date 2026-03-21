@@ -1,10 +1,15 @@
 #pragma once
 
 #include <format>
-#include <chrono>
 #include <iostream>
 
 #include "settings.hpp"
+
+namespace logging::detail
+{
+
+	double generate_timestamp();
+}
 
 template <typename... Args>
 void log(unsigned short verbosity, std::format_string<Args...> msg_fmt, Args &&...msg_args)
@@ -12,10 +17,7 @@ void log(unsigned short verbosity, std::format_string<Args...> msg_fmt, Args &&.
 	if (verbosity > settings::log_verbosity)
 		return;
 
-	auto now = std::chrono::system_clock::now();
-	auto ms_since_epoch = duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-
-	std::cout << std::format("{} {}", ((float)ms_since_epoch) / 1000.0, std::string(verbosity * 2, ' '))
+	std::cout << std::format("{} {}", logging::detail::generate_timestamp(), std::string(verbosity * 2, ' '))
 			  << std::format(msg_fmt, std::forward<Args>(msg_args)...)
 			  << std::endl;
 }

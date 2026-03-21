@@ -1,8 +1,9 @@
 #include "Lexer.hpp"
 
-#include "utils/error.hpp"
+#include <utility> // can delete?
+#include <stdexcept>
 
-#include <utility>
+#include "utils/error.hpp"
 
 char Lexer::take_char()
 {
@@ -68,7 +69,7 @@ Token Lexer::take()
 	}
 
 	Token tok;
-	tok.start = pos;
+	tok.loc.start = pos;
 
 	char c = take_char();
 
@@ -141,7 +142,7 @@ Token Lexer::take()
 		if (is_numeric(token_str[0]))
 		{
 			tok.type = TokenType::INT_LITERAL;
-			tok.token_str = token_str;
+			tok.str = token_str;
 		}
 		else if (token_str == "fn")
 		{
@@ -154,16 +155,16 @@ Token Lexer::take()
 		else
 		{
 			tok.type = TokenType::IDENT;
-			tok.token_str = token_str;
+			tok.str = token_str;
 		}
 	}
 	else
 	{
 		tok.type = TokenType::ERROR_UNEXPECTED_CHAR;
-		tok.token_str = std::string(1, c);
+		tok.str = std::string(1, c);
 	}
 
-	tok.end = pos;
+	tok.loc.end = pos;
 	return tok;
 }
 
@@ -180,11 +181,11 @@ Token Lexer::expect(TokenType expected_type)
 {
 	Token tok = this->take();
 	if (tok.type != expected_type)
-		throw CompileError(std::format("Unexpected token: {}, expected {}", toString(tok), toString(expected_type)));
+		throw CompileError(std::format("Unexpected token: {}, expected {}", to_string(tok), to_string(expected_type)));
 	return tok;
 }
 
-std::string toString(TokenType type)
+std::string to_string(TokenType type)
 {
 	switch (type)
 	{
@@ -225,20 +226,20 @@ std::string toString(TokenType type)
 	throw std::logic_error("Unhandled token type");
 }
 
-std::string toString(Token tok)
+std::string to_string(Token tok)
 {
 	switch (tok.type)
 	{
 	case TokenType::IDENT:
-		return std::format("identifier \"{}\"", tok.token_str);
+		return std::format("identifier \"{}\"", tok.str);
 	case TokenType::INT_LITERAL:
-		return std::format("integer literal \"{}\"", tok.token_str);
+		return std::format("integer literal \"{}\"", tok.str);
 	case TokenType::KEYWORD_FN:
 		return "keyword \"fn\"";
 	case TokenType::KEYWORD_RETURN:
 		return "keyword \"return\"";
 	case TokenType::ERROR_UNEXPECTED_CHAR:
-		return std::format("unexpected \"{}\"", tok.token_str);
+		return std::format("unexpected \"{}\"", tok.str);
 	}
-	return toString(tok.type);
+	return to_string(tok.type);
 }
