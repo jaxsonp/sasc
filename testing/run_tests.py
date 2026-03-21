@@ -138,3 +138,5 @@ if __name__ == "__main__":
     print(
         f"Testing complete\n{successes}/{len(tests)} tests passing ({100.0 * float(successes) / float(len(tests)):.2f}%)"
     )
+
+    sys.exit(0 if successes == len(tests) else 1)
