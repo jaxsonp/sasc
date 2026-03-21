@@ -81,17 +81,20 @@ class Test:
         os.makedirs(out, exist_ok=True)
         return out
 
-    def run(self, compiler_path: Path) -> TestResult:
+    def run(self, compiler_path: Path, compiler_verbosity: int) -> TestResult:
         output_dir = self.output_path()
         build_output_dir = output_dir / "build"
         os.makedirs(build_output_dir, exist_ok=True)
 
+        # building command
         with (
             open(build_output_dir / "stdout.txt", "w") as stdout_f,
             open(build_output_dir / "stderr.txt", "w") as stderr_f,
         ):
             build_res = subprocess.run(
-                [compiler_path, self.src_path], stdout=stdout_f, stderr=stderr_f
+                [compiler_path, self.src_path, *(["-v"] * compiler_verbosity)],
+                stdout=stdout_f,
+                stderr=stderr_f,
             )
 
         if build_res.returncode != 0:
@@ -105,6 +108,13 @@ class Test:
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Test runner")
     arg_parser.add_argument("compiler_path", help="Path of compiler binary to test")
+    arg_parser.add_argument(
+        "--compiler-verbosity",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Verbosity setting when setting compiler (default: 1)",
+    )
     args = arg_parser.parse_args()
 
     # validating args
@@ -112,6 +122,7 @@ if __name__ == "__main__":
     if not compiler_path.is_file():
         print(f'Could not find file: "{compiler_path}"')
         sys.exit(1)
+    compiler_verbosity = args.compiler_verbosity
 
     tests = [Test(f.relative_to(TESTS_DIR)) for f in TESTS_DIR.rglob("*.sasc")]
 
@@ -120,7 +131,7 @@ if __name__ == "__main__":
     successes = 0
     for test in tests:
         print(test.name, end=" -> ", flush=True)
-        res = test.run(compiler_path)
+        res = test.run(compiler_path, compiler_verbosity)
         print(res.describe())
         if res.is_success():
             successes += 1

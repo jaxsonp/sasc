@@ -1,5 +1,7 @@
 #include "Lexer.hpp"
 
+#include "utils/error.hpp"
+
 #include <utility>
 
 char Lexer::take_char()

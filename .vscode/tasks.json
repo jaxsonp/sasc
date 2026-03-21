@@ -15,9 +15,7 @@
 			"dependsOn": [
 				"CMake: Configure"
 			],
-			"problemMatcher": [
-				"$gcc",
-			],
+			"problemMatcher": ["$gcc", "$msCompile"],
 			"group": {
 				"kind": "build",
 				"isDefault": true

@@ -5,7 +5,7 @@
 #include <string>
 #include <format>
 
-#include "common.hpp"
+#include "utils/common.hpp"
 
 enum class TokenType
 {

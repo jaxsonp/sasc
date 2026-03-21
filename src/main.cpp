@@ -1,21 +1,34 @@
-#include "common.hpp"
-#include "AST.hpp"
 #include <fstream>
 #include <iostream>
+#include <cstring>
+
+#include "utils/common.hpp"
+#include "utils/logging.hpp"
+#include "utils/error.hpp"
+
+#include "Lexer.hpp"
+#include "AST.hpp"
 
 void compile(const std::string &);
 
 int main(int argc, char **argv)
 {
-	DBG_PRINT("debug output enabled\n");
 	if (argc < 2)
 	{
 		std::cerr << "Usage: sasc-compiler <file>" << std::endl;
 		return 1;
 	}
 
+	for (int i = 2; i < argc; ++i)
+	{
+		// TODO improve this
+		if (!strcmp(argv[i], "-v"))
+			global_log_verbosity += 1;
+	}
+	log_v("verbosity: {:d}", global_log_verbosity);
+
 	std::string filename = argv[1];
-	DBG_PRINT("file: %s\n", filename.c_str());
+	log_v("file: {:s}", filename.c_str());
 
 	try
 	{
@@ -37,19 +50,18 @@ int main(int argc, char **argv)
 
 void compile(const std::string &filename)
 {
-	DBG_PRINT("starting compilation\n");
+	log_v("starting compilation");
 	std::ifstream file(filename);
 	if (!file.is_open())
 		throw std::runtime_error(std::format("Failed to open file \"{}\"", filename));
 
+	log_vv("File opened");
+
+	log_vv("Initializing lexer");
 	Lexer lexer(file);
+
+	log_vv("Parsing AST");
 	AST ast(lexer);
 
-	DBG_PRINT("compilation complete\n");
-}
-
-void print_error(const std::string &msg, SourceLoc start, SourceLoc end)
-{
-	std::cerr << "ERROR: " << msg << "\n\tat line " << start.line << ", col " << start.col << "\n";
-	(void)end; // suppress unused parameter warning
+	log_v("compilation complete");
 }

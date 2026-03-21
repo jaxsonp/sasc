@@ -3,11 +3,9 @@
 #include <variant>
 #include <vector>
 #include <optional>
-#include <memory>
 
 #include "Lexer.hpp"
-#include "types.hpp"
-#include "common.hpp"
+#include "utils/common.hpp"
 
 // AST nodes stuff
 namespace ast
