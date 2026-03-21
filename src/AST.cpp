@@ -12,26 +12,16 @@ AST::AST(Lexer &lexer)
 {
 
 	log_vv("Attempting to parse AST");
-	try
+	while (true)
 	{
-		while (true)
+		if (auto parsed = ast::TopLevelDeclaration::try_parse(lexer))
 		{
-			if (auto parsed = ast::TopLevelDeclaration::try_parse(lexer))
-			{
-
-				this->tlds.push_back(std::move(parsed.value()));
-
-				continue;
-			}
-			break;
+			this->tlds.push_back(std::move(parsed.value()));
+			continue;
 		}
-		lexer.expect(TokenType::END_OF_FILE);
+		break;
 	}
-	catch (CompileError e)
-	{
-		e.add_prefix("syntax error: ");
-		throw e;
-	}
+	lexer.expect(TokenType::END_OF_FILE);
 
 	log_vv("Performing semantic analysis on AST");
 
@@ -43,23 +33,17 @@ AST::AST(Lexer &lexer)
 		this->top_level_symbols->add(name, type);
 	}
 
-	try
+	// semantic checks
+	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
 	{
-		for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
-		{
-			tld->check(this->top_level_symbols);
-		}
-	}
-	catch (CompileError e)
-	{
-		e.add_prefix("semantic error: ");
-		throw e;
+		tld->check(this->top_level_symbols);
 	}
 }
 
 void AST::debug_print() const
 {
 	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
+	// semantic checks
 	{
 		tld->debug_print(0);
 	}
@@ -139,12 +123,16 @@ namespace ast
 			ret->src_loc.start = lexer.take().loc.start;
 
 			if (lexer.peek().type == TokenType::SEMICOLON)
+			{
+				lexer.take();
 				return ret;
+			}
 
+			SourceLoc expr_start = lexer.peek().loc.start;
 			if (auto parsed_expr = ExpressionNode::try_parse(lexer))
 				ret->expr = std::move(parsed_expr.value());
 			else
-				throw CompileError("Expected expression", lexer.pos);
+				throw SyntaxError("Expected expression", expr_start);
 
 			ret->src_loc.end = lexer.expect(TokenType::SEMICOLON).loc.end;
 
@@ -245,7 +233,7 @@ namespace ast
 
 			// check return type
 			if (std::optional<FrontendType::Unknown> unknown = this->return_type.is_unknown())
-				throw CompileError(std::format("Invalid type: \"{}\"", unknown->str), unknown->loc);
+				throw TypeError(std::format("Unknown type: \"{}\"", unknown->str), unknown->loc);
 
 			// check args
 			for (ArgDefinition &arg : this->args)
@@ -327,7 +315,7 @@ namespace ast
 				ret.body = std::move(parsed.value());
 			}
 			else
-				throw CompileError("Expected a function body (e.g. \"{ ... }\")");
+				throw SyntaxError("Expected a function body");
 
 			ret.src_loc.end = ret.body->src_loc.end;
 			return ret;

@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <cstdint>
 
 #include "utils/common.hpp"
 #include "utils/logging.hpp"
@@ -39,16 +40,20 @@ int main(int argc, char **argv)
 	}
 	catch (CompileError e)
 	{
-		std::cerr << "\n\nCompilation failed: " << e.what() << "\n";
-		return 1;
+		std::cerr << std::endl
+				  << std::endl
+				  << "Compilation failed: " << e.what() << std::endl;
+		return exit_code_as_int(e.exit_code());
 	}
 	catch (std::exception e)
 	{
-		std::cerr << "\n\nException occured: " << e.what() << "\n";
-		return 2;
+		std::cerr << std::endl
+				  << std::endl
+				  << "Uncaught exception occurred: " << e.what() << std::endl;
+		return exit_code_as_int(ExitCode::UncaughtInternalError);
 	}
 
-	return 0;
+	return exit_code_as_int(ExitCode::Success);
 }
 
 void compile(const std::string &filename)

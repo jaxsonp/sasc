@@ -1,0 +1,5 @@
+//! RETURNS=100
+
+fn main() -> u32 {
+	return 100;
+}

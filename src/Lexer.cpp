@@ -118,7 +118,24 @@ Token Lexer::take()
 		}
 		else
 		{
-			// TODO
+			// TODO subtraction operator
+			throw UnimplementedError("'-'", tok.loc.start);
+		}
+	}
+	else if (c == '/')
+	{
+		if (peek_char() == '/')
+		{
+			// line comment, consume till newline
+			while (take_char() != '\n')
+				;
+			// next token
+			return this->take(); // TODO is this bad? possible stack overflow?
+		}
+		else
+		{
+			// TODO division operator
+			throw UnimplementedError("'/'", tok.loc.start);
 		}
 	}
 	else if (is_whitespace(c))
@@ -181,7 +198,7 @@ Token Lexer::expect(TokenType expected_type)
 {
 	Token tok = this->take();
 	if (tok.type != expected_type)
-		throw CompileError(std::format("Unexpected token: {}, expected {}", to_string(tok), to_string(expected_type)));
+		throw SyntaxError(std::format("Unexpected token: {}, expected {}", to_string(tok), to_string(expected_type)), tok.loc);
 	return tok;
 }
 

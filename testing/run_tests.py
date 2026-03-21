@@ -2,7 +2,6 @@ import argparse
 import sys
 import os
 from pathlib import Path, PurePath
-from dataclasses import dataclass
 import subprocess
 
 TESTS_DIR = Path(__file__).parent / "tests"
@@ -16,33 +15,14 @@ GREEN = "\x1b[32m"
 RED = "\x1b[31m"
 
 
-@dataclass
-class TestResult:
-    # return code of the compilation
-    build_status: int = 0
-    # whether the test produced correct output
-    correct: None | bool = None
-
-    def describe(self) -> str:
-        if self.build_status != 0:
-            return f"{RED}build failed with code {self.build_status}{RESET_COLOR}"
-        return (
-            f"{GREEN}success{RESET_COLOR}"
-            if self.correct
-            else f"{RED}failed{RESET_COLOR}"
-        )
-
-    def is_success(self) -> bool:
-        return self.build_status == 0 and self.correct
-
-
 class Test:
     name: str
     rel_path: PurePath
-    src_path: Path
-    expected_path: Path
-    expected_ret: int
-    expected_stdout: str | None
+    full_path: Path
+    expected_build_exit_code: int = 0
+    expected_exit_code: int = 0
+    expected_stdout: str = ""
+    expected_stderr: str = ""
 
     def __init__(self, rel_path: PurePath):
         """
@@ -51,29 +31,34 @@ class Test:
         self.rel_path = rel_path
         self.name = rel_path.as_posix()
 
-        self.src_path = TESTS_DIR / rel_path
-        if not self.src_path.is_file():
-            print(f'Invalid test "{self.name}": Unable to find file "{self.src_path}"')
-            sys.exit(1)
-
-        self.expected_path = TESTS_DIR / rel_path.with_suffix(".expected")
-        if not self.expected_path.is_file():
+        self.full_path = TESTS_DIR / rel_path
+        if not self.full_path.is_file():
             print(
-                f'Invalid test "{self.name}": Unable to find file "{self.expected_path}"'
+                f'Invalid test "{self.name}": Unable to find file at "{self.full_path}"'
             )
             sys.exit(1)
 
         try:
-            with open(self.expected_path, "r") as expected_file:
-                self.expected_ret = int(expected_file.readline())
-                self.expected_stdout = expected_file.read()
+            with open(self.full_path, "r") as f:
+                line = f.readline()
+                while line.startswith("//!"):
+                    pair = line[3:].lstrip().rstrip("\n").split("=")
+                    key = pair[0].lstrip()
+                    val = pair[1]
+                    match key:
+                        case "BUILD_EXIT_CODE":
+                            self.expected_build_exit_code = int(val)
+                        case "EXIT_CODE":
+                            self.expected_exit_code = int(val)
+                        case "STDOUT":
+                            self.expected_stdout = val
+                        case "STDERR":
+                            self.expected_stdout = val
+                    line = f.readline()
         except FileNotFoundError:
             print(
-                f'Invalid test "{self.name}": Unable to find *.expected file at {self.expected_path}'
+                f'Invalid test "{self.name}": Unable to open file at {self.expected_path}'
             )
-            sys.exit(1)
-        except TypeError:
-            print(f'Invalid test "{self.name}": Invalid .expected file')
             sys.exit(1)
 
     def output_path(self) -> Path:
@@ -81,7 +66,7 @@ class Test:
         os.makedirs(out, exist_ok=True)
         return out
 
-    def run(self, compiler_path: Path, compiler_verbosity: int) -> TestResult:
+    def run(self, compiler_path: Path, compiler_verbosity: int) -> tuple[bool, str]:
         output_dir = self.output_path()
         build_output_dir = output_dir / "build"
         os.makedirs(build_output_dir, exist_ok=True)
@@ -92,17 +77,16 @@ class Test:
             open(build_output_dir / "stderr.txt", "w") as stderr_f,
         ):
             build_res = subprocess.run(
-                [compiler_path, self.src_path, *(["-v"] * compiler_verbosity)],
+                [compiler_path, self.full_path, *(["-v"] * compiler_verbosity)],
                 stdout=stdout_f,
                 stderr=stderr_f,
             )
 
-        if build_res.returncode != 0:
+        if build_res.returncode != self.expected_build_exit_code:
             # build failed
-            return TestResult(build_status=build_res.returncode)
+            return (False, "failed, unexpected build exit code")
 
-        # success
-        return TestResult()
+        return (False, "cant run yet")
 
 
 if __name__ == "__main__":
@@ -124,16 +108,17 @@ if __name__ == "__main__":
         sys.exit(1)
     compiler_verbosity = args.compiler_verbosity
 
+    print(f"Reading tests from {TESTS_DIR}")
     tests = [Test(f.relative_to(TESTS_DIR)) for f in TESTS_DIR.rglob("*.sasc")]
 
     print(f"Running {len(tests)} test{'s' if len(tests) > 1 else ''}")
 
     successes = 0
     for test in tests:
-        print(test.name, end=" -> ", flush=True)
-        res = test.run(compiler_path, compiler_verbosity)
-        print(res.describe())
-        if res.is_success():
+        print(f" {test.name} -> ", end="", flush=True)
+        success, msg = test.run(compiler_path, compiler_verbosity)
+        print((GREEN if success else RED) + msg + RESET_COLOR)
+        if success:
             successes += 1
     print(
         f"Testing complete\n{successes}/{len(tests)} tests passing ({100.0 * float(successes) / float(len(tests)):.2f}%)"

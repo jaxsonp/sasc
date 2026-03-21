@@ -38,6 +38,7 @@ struct Token
 
 std::string to_string(Token tok);
 
+/// @brief Lexer, converts characters to tokens on demand. Infinitely returns EOF token when completed.
 class Lexer
 {
 public:
@@ -50,7 +51,7 @@ public:
 	Token peek();
 	/// Consumes and returns the next token if it matches the expected type, throwing a `CompileError` if not
 	Token expect(TokenType expected_type);
-	bool is_done() const { return done; }
+	inline bool is_done() const noexcept { return done; }
 
 private:
 	std::istream &in;

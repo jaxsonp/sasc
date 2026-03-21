@@ -1,0 +1,5 @@
+//! RETURNS=100
+
+fn main() -> i32 {
+	return 100;
+}

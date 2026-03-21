@@ -2,6 +2,26 @@
 
 #include <string>
 
+enum class ExitCode : u_int8_t
+{
+	Success = 0,
+
+	// compilation errors
+	SyntaxError = 1,
+	NameError = 2,
+	TypeError = 3,
+
+	// non-compilation errors
+	FileReadError = 0xE0,
+
+	// internal errors
+	Unimplemented = 0xFD,
+	InternalError = 0xFE,
+	UncaughtInternalError = 0xFF,
+};
+
+inline int exit_code_as_int(ExitCode code) { return static_cast<int>(code); }
+
 struct SourceLoc
 {
 	unsigned int line = 0;

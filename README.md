@@ -12,9 +12,13 @@ Soon:
 - float literals
 - if statements
 - loops
+- functions
+	- function definitions/declaration
 
 Before self-hosting:
 
+- global vars
+	- global init dependency checking
 - structs
 - traits
 - stdlib
@@ -27,4 +31,5 @@ Eventually:
 
 - only supporting 32-bit
 - ok main return values: void, i32, u32
-- top level declarations are hoisted
+- all top level functions are hoisted (global var initialization is calculated with DAG)
+- error codes found in utils/error.hpp
