@@ -310,12 +310,13 @@ namespace ast
 			}
 
 			// must be a block here
+			SourceLoc block_start = lexer.pos;
 			if (std::optional<std::unique_ptr<Block>> parsed = Block::try_parse(lexer))
 			{
 				ret.body = std::move(parsed.value());
 			}
 			else
-				throw SyntaxError("Expected a function body");
+				throw SyntaxError("Expected a function body", block_start);
 
 			ret.src_loc.end = ret.body->src_loc.end;
 			return ret;

@@ -3,6 +3,7 @@ import sys
 import os
 from pathlib import Path, PurePath
 import subprocess
+import re
 
 TESTS_DIR = Path(__file__).parent / "tests"
 os.makedirs(TESTS_DIR, exist_ok=True)
@@ -13,6 +14,10 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 RESET_COLOR = "\x1b[0m"
 GREEN = "\x1b[32m"
 RED = "\x1b[31m"
+
+
+# pattern for parsing test definition kv pairs
+TEST_DEFINITION_PAT = r"^//!\s*([^=]+)=(.*)"
 
 
 class Test:
@@ -40,11 +45,15 @@ class Test:
 
         try:
             with open(self.full_path, "r") as f:
-                line = f.readline()
-                while line.startswith("//!"):
-                    pair = line[3:].lstrip().rstrip("\n").split("=")
-                    key = pair[0].lstrip()
-                    val = pair[1]
+                while True:
+                    line = f.readline()
+                    if len(line) == 0:
+                        break
+                    match = re.match(TEST_DEFINITION_PAT, line.rstrip("\n"))
+                    if not match:
+                        break
+                    key = match.group(1)
+                    val = match.group(2)
                     match key:
                         case "BUILD_EXIT_CODE":
                             self.expected_build_exit_code = int(val)
@@ -83,8 +92,17 @@ class Test:
             )
 
         if build_res.returncode != self.expected_build_exit_code:
-            # build failed
-            return (False, "failed, unexpected build exit code")
+            # unexpected build exit code
+            return (
+                False,
+                f"{RED}failed{RESET_COLOR} (build exited with {build_res.returncode}, expected {self.expected_build_exit_code})",
+            )
+        elif build_res.returncode != 0:
+            # expected build failure
+            return (
+                True,
+                f"{GREEN}success{RESET_COLOR}",
+            )
 
         return (False, "cant run yet")
 
@@ -117,7 +135,7 @@ if __name__ == "__main__":
     for test in tests:
         print(f" {test.name} -> ", end="", flush=True)
         success, msg = test.run(compiler_path, compiler_verbosity)
-        print((GREEN if success else RED) + msg + RESET_COLOR)
+        print(msg)
         if success:
             successes += 1
     print(

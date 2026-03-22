@@ -3,7 +3,6 @@
 #include <exception>
 #include <string>
 #include <variant>
-#include <cstdint>
 
 #include "utils/common.hpp"
 
@@ -13,7 +12,7 @@ public:
 	using LocVariant = std::variant<std::monostate, SourceLoc, SourceLocRange>;
 
 private:
-	const ExitCode code;
+	const ExitCode code = ExitCode::UncaughtInternalError;
 
 protected:
 	// ctor for implementors

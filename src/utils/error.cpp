@@ -3,7 +3,7 @@
 #include <format>
 
 CompileError::CompileError(const char *type_name, ExitCode exit_code, const std::string &error_msg, LocVariant src_loc)
-	: code(code)
+	: code(exit_code)
 {
 	if (std::holds_alternative<SourceLoc>(src_loc))
 	{

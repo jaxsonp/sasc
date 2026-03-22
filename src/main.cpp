@@ -36,19 +36,20 @@ int main(int argc, char **argv)
 
 	try
 	{
+		log("{}: compiling...", filename);
 		compile(filename);
+		log("{}: compilation complete", filename);
 	}
 	catch (CompileError e)
 	{
 		std::cerr << std::endl
-				  << std::endl
-				  << "Compilation failed: " << e.what() << std::endl;
+				  << e.what() << std::endl;
+		log("{}: compilation failed", filename);
 		return exit_code_as_int(e.exit_code());
 	}
 	catch (std::exception e)
 	{
 		std::cerr << std::endl
-				  << std::endl
 				  << "Uncaught exception occurred: " << e.what() << std::endl;
 		return exit_code_as_int(ExitCode::UncaughtInternalError);
 	}
@@ -58,7 +59,6 @@ int main(int argc, char **argv)
 
 void compile(const std::string &filename)
 {
-	log("{}: compiling...", filename);
 	std::ifstream file(filename);
 	if (!file.is_open())
 		throw std::runtime_error(std::format("Failed to open file \"{}\"", filename));
@@ -76,6 +76,4 @@ void compile(const std::string &filename)
 		log_vv("Printing AST");
 		ast.debug_print();
 	}
-
-	log("{}: compilation complete", filename);
 }

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 
-enum class ExitCode : u_int8_t
+enum class ExitCode : uint8_t
 {
 	Success = 0,
 
