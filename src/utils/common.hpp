@@ -29,6 +29,8 @@ struct SourceLoc
 	unsigned int col = 0;
 
 	std::string to_string() const;
+
+	bool operator==(const SourceLoc &other) const = default;
 };
 
 struct SourceLocRange
@@ -37,6 +39,8 @@ struct SourceLocRange
 	SourceLoc end;
 
 	std::string to_string() const;
+
+	bool operator==(const SourceLocRange &other) const = default;
 };
 
 bool is_whitespace(char c);

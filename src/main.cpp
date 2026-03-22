@@ -61,7 +61,7 @@ void compile(const std::string &filename)
 {
 	std::ifstream file(filename);
 	if (!file.is_open())
-		throw std::runtime_error(std::format("Failed to open file \"{}\"", filename));
+		throw FileReadError(std::format("Failed to open file \"{}\"", filename));
 
 	log_vv("File opened");
 
@@ -76,4 +76,7 @@ void compile(const std::string &filename)
 		log_vv("Printing AST");
 		ast.debug_print();
 	}
+
+	log_vv("Emitting IR");
+	auto functions = ast.emitIr();
 }

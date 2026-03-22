@@ -26,10 +26,15 @@ Before self-hosting:
 Eventually:
 
 - try doing UTF8
+- labelled code blocks (for early breaks)
+  
+## Notes for self
+
+- RISC-V addi only supports a 12-bit signed immediate. The code generator will eventually have to "expand" a large LoadImm into a sequence like lui and addi.
 
 ## Notes for documentation
 
 - only supporting 32-bit
 - ok main return values: void, i32, u32
 - all top level functions are hoisted (global var initialization is calculated with DAG)
-- error codes found in utils/error.hpp
+- exit codes found in utils/common.hpp

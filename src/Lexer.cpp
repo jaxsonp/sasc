@@ -91,19 +91,19 @@ Token Lexer::take()
 	}
 	else if (c == '[')
 	{
-		tok.type = TokenType::L_BRACE;
+		tok.type = TokenType::L_SQR_BRACKET;
 	}
 	else if (c == ']')
 	{
-		tok.type = TokenType::R_BRACE;
+		tok.type = TokenType::R_SQR_BRACKET;
 	}
 	else if (c == '{')
 	{
-		tok.type = TokenType::L_BRACKET;
+		tok.type = TokenType::L_CURLY_BRACKET;
 	}
 	else if (c == '}')
 	{
-		tok.type = TokenType::R_BRACKET;
+		tok.type = TokenType::R_CURLY_BRACKET;
 	}
 	else if (c == ',')
 	{
@@ -224,13 +224,13 @@ std::string to_string(TokenType type)
 		return "\"(\")";
 	case TokenType::R_PAREN:
 		return "\")\"";
-	case TokenType::L_BRACE:
+	case TokenType::L_SQR_BRACKET:
 		return "\"[\"";
-	case TokenType::R_BRACE:
+	case TokenType::R_SQR_BRACKET:
 		return "\"]\"";
-	case TokenType::L_BRACKET:
+	case TokenType::L_CURLY_BRACKET:
 		return "\"{\"";
-	case TokenType::R_BRACKET:
+	case TokenType::R_CURLY_BRACKET:
 		return "\"}\"";
 	case TokenType::COMMA:
 		return "\",\"";
@@ -240,7 +240,7 @@ std::string to_string(TokenType type)
 		return "Unexpected char";
 	}
 
-	throw std::logic_error("Unhandled token type");
+	throw UnimplementedError("Unhandled token type");
 }
 
 std::string to_string(Token tok)

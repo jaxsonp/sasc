@@ -52,6 +52,13 @@ public:
 		: CompileError("Type error", ExitCode::TypeError, msg, loc) {}
 };
 
+class FileReadError : public CompileError
+{
+public:
+	FileReadError(const std::string &msg, LocVariant loc = std::monostate{})
+		: CompileError("File read error", ExitCode::FileReadError, msg, loc) {}
+};
+
 class UnimplementedError : public CompileError
 {
 public:

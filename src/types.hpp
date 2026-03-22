@@ -6,7 +6,7 @@
 #include "Lexer.hpp"
 
 /// @brief A "physical" type
-enum ConcreteType
+enum class ConcreteType
 {
 	VOID,
 	U32,
@@ -23,6 +23,8 @@ public:
 	{
 		std::string str;
 		SourceLocRange loc;
+
+		bool operator==(const Unknown &other) const = default;
 	};
 
 	FrontendType() : variant(ConcreteType::VOID) {};
@@ -34,6 +36,10 @@ public:
 	std::optional<Unknown> is_unknown() const;
 
 	std::string to_string() const;
+
+	friend bool operator==(const FrontendType &lhs, const FrontendType &rhs);
+	friend bool operator==(const FrontendType &lhs, const ConcreteType &rhs);
+	friend bool operator==(const ConcreteType &lhs, const FrontendType &rhs);
 
 private:
 	std::variant<ConcreteType, Unknown> variant;

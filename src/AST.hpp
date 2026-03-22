@@ -8,34 +8,63 @@
 #include <memory>
 
 #include "Lexer.hpp"
+#include "IR.hpp"
 #include "types.hpp"
 #include "utils/common.hpp"
 
-class SymbolTable
+enum class SymbolType
 {
-	std::unordered_map<std::string, std::optional<FrontendType>> symbols;
+	Variable,
+};
+
+struct Symbol
+{
+	std::string name;
+	FrontendType variable_type;
+
+	Symbol(std::string _name, FrontendType _variable_type) : name(_name), variable_type(_variable_type) {}
+};
+
+class SymbolScope
+{
+	std::unordered_map<std::string, Symbol> symbols;
 
 public:
-	/// @brief Parent (nullptr if root)
-	std::weak_ptr<SymbolTable> parent;
-	std::vector<std::shared_ptr<SymbolTable>> children;
+	/// @brief Parent (if not root)
+	SymbolScope *parent;
+
+	virtual SymbolScope *get_parent() { return this->parent; };
+	virtual inline bool is_root() { return false; };
 
 	// std::optional<Type> find_symbol(const std::string &name, bool recursive = true);
 
-	/// @brief Attempts to insert a symbol into this symbol table scope, reporting wh
+	/// @brief Insert a symbol into this symbol table scope, throwing on collision
 	/// @param name Symbol name
 	/// @param type Symbol type
-	/// @return Returns true if insertion was successful, false if symbol is already defined here
-	inline bool add(std::string name, FrontendType type);
-	/// @brief Attempts to insert a symbol into this symbol table scope, reporting wh
+	void add(std::string name, FrontendType type);
+	/// @brief Insert a symbol into this symbol table scope, throwing on collision
 	/// @param symbol Name/type pair
-	/// @return Returns true if insertion was successful, false if symbol is already defined here
-	bool add(std::pair<std::string, FrontendType> symbol);
+	inline void add(std::pair<std::string, FrontendType> symbol);
 
-	SymbolTable() = default;
+	SymbolScope(SymbolScope *parent);
 };
 
-// AST nodes stuff
+class GlobalSymbolTable : public SymbolScope
+{
+public:
+	virtual inline bool is_root() { return false; };
+	GlobalSymbolTable() : SymbolScope(nullptr) {}
+};
+
+struct SemanticAnalysisState
+{
+	std::optional<FrontendType> fn_return_type;
+	SymbolScope *cur_scope;
+	GlobalSymbolTable *symbols;
+
+	SemanticAnalysisState(GlobalSymbolTable *symbols);
+};
+
 namespace ast
 {
 
@@ -45,8 +74,9 @@ namespace ast
 	public:
 		SourceLocRange src_loc;
 
-		virtual void check(std::shared_ptr<SymbolTable> symbols) = 0;
+		virtual void check_semantics(SemanticAnalysisState state) const = 0;
 		virtual void debug_print(unsigned int depth) const = 0;
+		virtual void emitIr(IrWriter &writer) const = 0;
 
 		virtual ~Node() = default;
 	};
@@ -65,6 +95,8 @@ namespace ast
 	{
 	public:
 		static std::optional<std::unique_ptr<ExpressionNode>> try_parse(Lexer &lexer);
+
+		virtual FrontendType get_type() const = 0;
 	};
 
 	// statement interface
@@ -74,90 +106,102 @@ namespace ast
 		static std::optional<std::unique_ptr<StatementNode>> try_parse(Lexer &lexer);
 	};
 
-	// AST node types
-	namespace node_types
+	struct IntegerLiteralExpression : ExpressionNode
 	{
+		std::string value;
+		FrontendType type;
 
-		struct IntegerLiteralExpression : ExpressionNode
-		{
-			std::string value;
-			FrontendType type;
+		void check_semantics(SemanticAnalysisState state) const override;
+		void debug_print(unsigned int depth = 0) const override;
+		void emitIr(IrWriter &writer) const override;
 
-			void check(std::shared_ptr<SymbolTable> scope) override;
-			void debug_print(unsigned int depth = 0) const override;
+		static std::optional<std::unique_ptr<IntegerLiteralExpression>> try_parse(Lexer &lexer);
 
-			static std::optional<std::unique_ptr<IntegerLiteralExpression>> try_parse(Lexer &lexer);
-		};
+		inline FrontendType get_type() const override { return this->type; };
+	};
 
-		struct ReturnStatement : StatementNode
-		{
-			std::unique_ptr<ExpressionNode> expr;
+	struct ReturnStatement : StatementNode
+	{
+		std::unique_ptr<ExpressionNode> expr;
 
-			void check(std::shared_ptr<SymbolTable> scope) override;
-			void debug_print(unsigned int depth = 0) const override;
+		void check_semantics(SemanticAnalysisState state) const override;
+		void debug_print(unsigned int depth = 0) const override;
+		void emitIr(IrWriter &writer) const override;
 
-			static std::optional<std::unique_ptr<ReturnStatement>> try_parse(Lexer &lexer);
-		};
+		static std::optional<std::unique_ptr<ReturnStatement>> try_parse(Lexer &lexer);
 
-		struct Block : Node
-		{
-			std::vector<std::unique_ptr<StatementNode>> statements;
-			std::unique_ptr<ExpressionNode> expression;
-			std::shared_ptr<SymbolTable> symbols;
+		inline FrontendType return_type() const;
+	};
 
-			void check(std::shared_ptr<SymbolTable> scope) override;
-			void debug_print(unsigned int depth = 0) const override;
+	/*struct Block : Node
+	{
+		std::vector<std::unique_ptr<StatementNode>> statements;
+		std::unique_ptr<ExpressionNode> expr;
+		std::shared_ptr<SymbolTable> symbols;
+		bool is_function_body = false;
 
-			static std::optional<std::unique_ptr<Block>> try_parse(Lexer &lexer);
-		};
+		void check_semantics(SemanticAnalysisState state) const override;
+		void debug_print(unsigned int depth = 0) const override;
+		/// @brief Leaves writer at the end of this block's basic block
+		void emitIr(IrWriter &writer) const override;
 
-		struct ArgDefinition : Node
-		{
-			FrontendType type;
-			std::string name;
+		static std::optional<std::unique_ptr<Block>> try_parse(Lexer &lexer);
 
-			void check(std::shared_ptr<SymbolTable> scope) override;
-			void debug_print(unsigned int depth = 0) const override;
+		Block();
+	};*/
 
-			static std::optional<ArgDefinition> try_parse(Lexer &lexer);
+	struct ArgDefinition : Node
+	{
+		FrontendType type;
+		std::string name;
 
-		private:
-			ArgDefinition() = default;
-		};
+		void check_semantics(SemanticAnalysisState state) const override;
+		void debug_print(unsigned int depth = 0) const override;
+		/// @brief nop
+		/// function arg emission handled by function
+		void emitIr(IrWriter &writer) const override {};
 
-		struct FunctionDefinition : TopLevelDeclaration
-		{
-			std::string name;
-			std::vector<ArgDefinition> args;
-			FrontendType return_type;
-			std::string return_type_str;
-			std::unique_ptr<Block> body;
+		static std::optional<ArgDefinition> try_parse(Lexer &lexer);
 
-			void check(std::shared_ptr<SymbolTable> scope) override;
-			void debug_print(unsigned int depth = 0) const override;
+	private:
+		ArgDefinition() = default;
+	};
 
-			static std::optional<FunctionDefinition> try_parse(Lexer &lexer);
+	struct FunctionDefinition : TopLevelDeclaration
+	{
+		std::string name;
+		std::vector<ArgDefinition> args;
+		FrontendType return_type;
+		std::vector<std::unique_ptr<StatementNode>> body_statements;
+		/// null if there is no return expression
+		std::unique_ptr<ExpressionNode> body_return_expr;
+		SymbolScope *scope;
 
-			inline std::pair<std::string, FrontendType> declares() const override
-			{
-				return {this->name, this->return_type};
-			}
+		void check_semantics(SemanticAnalysisState state) const override;
+		void debug_print(unsigned int depth = 0) const override;
+		void emitIr(IrWriter &writer) const override;
 
-		private:
-			FunctionDefinition() = default;
-		};
+		static std::optional<FunctionDefinition> try_parse(Lexer &lexer);
 
-	}
+		inline std::pair<std::string, FrontendType> declares() const override;
+
+	private:
+		FunctionDefinition();
+	};
 }
 
 class AST
 {
 	std::vector<std::unique_ptr<ast::TopLevelDeclaration>> tlds;
-	std::shared_ptr<SymbolTable> top_level_symbols;
+	GlobalSymbolTable *symbols;
 
 public:
 	// attempt to create an AST from tokens
 	AST(Lexer &lexer);
 
 	void debug_print() const;
+	std::unordered_map<std::string, ir::Function *> emitIr() const;
+
+	// no need to delete symbol tables here, they are owned and will be deleted by AST nodes
+	~AST() = default;
 };
