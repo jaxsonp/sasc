@@ -3,7 +3,7 @@
 #include <string>
 #include <variant>
 
-#include "Lexer.hpp"
+#include "frontend/Lexer.hpp"
 
 /// @brief A "physical" type
 enum class ConcreteType

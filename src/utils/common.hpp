@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <cstdint>
+#include <stdint.h>
 
 enum class ExitCode : uint8_t
 {
@@ -14,6 +14,7 @@ enum class ExitCode : uint8_t
 
 	// non-compilation errors
 	FileReadError = 0xE0,
+	UsageError = 0xE1,
 
 	// internal errors
 	Unimplemented = 0xFD,

@@ -1,12 +1,13 @@
 #pragma once
 
+#include <istream>
 #include <variant>
-#include <tuple>
 #include <vector>
 #include <optional>
 #include <unordered_map>
 #include <memory>
 #include <string>
+#include <stdint.h>
 
 #include "Lexer.hpp"
 #include "IR.hpp"
@@ -197,8 +198,8 @@ class AST
 	GlobalSymbolTable *symbols;
 
 public:
-	// attempt to create an AST from tokens
-	AST(Lexer &lexer);
+	/// attempt to create an AST from input stream
+	AST(std::istream &input);
 
 	void debug_print() const;
 	std::unordered_map<std::string, ir::Function *> emitIr() const;

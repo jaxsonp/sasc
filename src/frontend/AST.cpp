@@ -1,4 +1,4 @@
-#include "AST.hpp"
+#include "frontend/AST.hpp"
 
 #include <format>
 #include <iostream>
@@ -8,9 +8,13 @@
 
 #include "utils/error.hpp"
 #include "utils/logging.hpp"
+#include "AST.hpp"
 
-AST::AST(Lexer &lexer)
+AST::AST(std::istream &input)
 {
+	log_vv("Initializing lexer on input stream");
+	Lexer lexer(input);
+
 	log_vv("Attempting to parse AST");
 	while (true)
 	{
@@ -137,9 +141,9 @@ namespace ast
 		else if (ret->type == ConcreteType::U32)
 		{
 			long long value_ll = std::stoll(value_str);
-			if (!std::in_range<u_int32_t>(value_ll))
+			if (!std::in_range<uint32_t>(value_ll))
 				throw TypeError("Integer literal out of bounds for type: u32");
-			u_int32_t value_uint = u_int32_t(value_ll);
+			uint32_t value_uint = uint32_t(value_ll);
 			ret->value = std::bit_cast<int32_t, uint32_t>(value_uint);
 		}
 		else

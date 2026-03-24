@@ -1,15 +1,12 @@
 #include <fstream>
 #include <iostream>
-#include <cstring>
-#include <cstdint>
 
 #include "utils/CliParser.hpp"
 #include "utils/common.hpp"
 #include "utils/logging.hpp"
 #include "utils/error.hpp"
 
-#include "Lexer.hpp"
-#include "AST.hpp"
+#include "frontend/AST.hpp"
 
 void compile(const std::string &);
 
@@ -42,8 +39,13 @@ int main(int argc, char **argv)
 	settings::debug_print_ast = debug_print_ast_flag.present();
 	log_vv("debug print ast: {}", bool_str(settings::debug_print_ast));
 
-	std::string filename = argv[1];
+	std::string filename = filename_arg.value();
 	log_vv("input file: {:s}", filename.c_str());
+	if (filename.empty())
+	{
+		std::cerr << "Missing input file\n";
+		return exit_code_as_int(ExitCode::UsageError);
+	}
 
 	try
 	{
@@ -77,8 +79,7 @@ void compile(const std::string &filename)
 	log_vv("File opened");
 
 	log_v("Building AST");
-	Lexer lexer(file);
-	AST ast(lexer);
+	AST ast(file);
 
 	if (settings::debug_print_ast)
 	{
