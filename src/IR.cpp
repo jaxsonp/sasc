@@ -11,11 +11,17 @@ namespace ir
 
 	namespace instr
 	{
-		LoadArgInstruction::LoadArgInstruction(VRegId _dst, unsigned short index)
-			: Instruction(Op::LoadArg), arg_index(index), dst(_dst) {}
+		LoadArgInstruction::LoadArgInstruction(VRegId _dest, unsigned short index)
+			: Instruction(Op::LoadArg), arg_index(index), dest(_dest) {}
+
+		ReturnInstruction::ReturnInstruction()
+			: TerminalInstruction(Op::Return) {}
 
 		ReturnInstruction::ReturnInstruction(VRegId _ret_value)
 			: TerminalInstruction(Op::Return), ret_value(_ret_value) {}
+
+		LoadImmInstruction::LoadImmInstruction(VRegId _dest, int32_t _value)
+			: Instruction(Op::LoadImm), dest(_dest), value(_value) {}
 	}
 
 	Function::Function(const std::string &_name)
@@ -24,12 +30,28 @@ namespace ir
 		this->entry = new BasicBlock(this->name + ".entry");
 	}
 
+	/*Value Value::new_vreg(VRegId id, Type t)
+	{
+		Value v;
+		v.type = t;
+		v.data.vreg_id = id;
+		return v;
+	}
+	Value Value::new_immediate(int32_t val)
+	{
+		Value v;
+		v.type = Type::i32();
+		v.data.imm_val = val;
+		return v;
+	}*/
 }
 
 void IrWriter::new_function(const std::string &name)
 {
 	this->cur_function = new ir::Function(name);
 	this->functions.insert({name, this->cur_function});
+
+	this->cur_bblock = this->cur_function->entry;
 
 	// reset vreg maps
 	this->vreg_map_scopes.clear();
@@ -59,10 +81,12 @@ ir::VRegId IrWriter::get_local(const std::string &name) const
 
 void IrWriter::push_scope()
 {
+	this->vreg_map_scopes.emplace_back();
 }
 
 void IrWriter::pop_scope()
 {
+	this->vreg_map_scopes.pop_back();
 }
 
 ir::VRegId IrWriter::new_vreg()

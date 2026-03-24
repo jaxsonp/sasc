@@ -21,7 +21,7 @@ enum class ExitCode : uint8_t
 	UncaughtInternalError = 0xFF,
 };
 
-inline int exit_code_as_int(ExitCode code) { return static_cast<int>(code); }
+inline int exit_code_as_int(ExitCode code) noexcept { return static_cast<int>(code); }
 
 struct SourceLoc
 {

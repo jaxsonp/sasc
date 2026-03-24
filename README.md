@@ -4,16 +4,15 @@
 
 Next time
 
-- comments
-- better testing
+- Negative literals (broken right now I think)
 
 Soon:
 
-- float literals
 - if statements
 - loops
 - functions
 	- function definitions/declaration
+- floats
 
 Before self-hosting:
 
@@ -38,3 +37,7 @@ Eventually:
 - ok main return values: void, i32, u32
 - all top level functions are hoisted (global var initialization is calculated with DAG)
 - exit codes found in utils/common.hpp
+
+## tests to remember to write
+
+- overflowing int literal

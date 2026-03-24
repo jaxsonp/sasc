@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <utility>
+#include <bit>
 
 #include "utils/error.hpp"
 #include "utils/logging.hpp"
@@ -90,21 +91,20 @@ namespace ast
 {
 	void IntegerLiteralExpression::check_semantics(SemanticAnalysisState state) const
 	{
-		if (this->type != ConcreteType::I32 && this->type != ConcreteType::U32)
-			throw TypeError(std::format("Invalid type for integer literal: {}", this->type.to_string()), this->src_loc);
-
-		// TODO check for signedness and stuff
 	}
 
 	void IntegerLiteralExpression::debug_print(unsigned int depth) const
 	{
 		std::cout << std::string(depth * 2, ' ');
-		std::cout << "Integer literal expression (value: \"" << this->value << "\", type annotation: " << this->type.to_string() << ")";
+		std::cout << "Integer literal expression (value: " << this->value << ", type annotation: " << this->type.to_string() << ")";
 		std::cout << " [" << this->src_loc.to_string() << "]" << std::endl;
 	}
 
-	void IntegerLiteralExpression::emitIr(IrWriter &writer) const
+	ir::VRegId IntegerLiteralExpression::emitIr(IrWriter &writer) const
 	{
+		ir::VRegId result_reg(writer.new_vreg());
+		writer.emit(new ir::instr::LoadImmInstruction(result_reg, this->value));
+		return result_reg;
 	}
 
 	std::optional<std::unique_ptr<IntegerLiteralExpression>> IntegerLiteralExpression::try_parse(Lexer &lexer)
@@ -121,10 +121,28 @@ namespace ast
 		while (type_annotation_pos != tok.str.end() && is_numeric(*type_annotation_pos))
 			++type_annotation_pos;
 
-		ret->value = std::string(tok.str.begin(), type_annotation_pos);
-
+		std::string value_str(tok.str.begin(), type_annotation_pos);
 		std::string type_str(type_annotation_pos, tok.str.end());
+
+		// parsing type and value
 		ret->type = FrontendType(type_str, tok.loc);
+		if (ret->type == ConcreteType::I32)
+		{
+			long long value_ll = std::stoll(value_str);
+			if (!std::in_range<int32_t>(value_ll))
+				throw TypeError("Integer literal out of bounds for type: i32");
+			ret->value = int32_t(value_ll);
+		}
+		else if (ret->type == ConcreteType::U32)
+		{
+			long long value_ll = std::stoll(value_str);
+			if (!std::in_range<u_int32_t>(value_ll))
+				throw TypeError("Integer literal out of bounds for type: u32");
+			u_int32_t value_uint = u_int32_t(value_ll);
+			ret->value = std::bit_cast<int32_t, uint32_t>(value_uint);
+		}
+		else
+			throw TypeError(std::format("Invalid type for integer literal: {}", ret->type.to_string()), ret->src_loc);
 
 		return ret;
 	}
@@ -154,6 +172,15 @@ namespace ast
 
 	void ReturnStatement::emitIr(IrWriter &writer) const
 	{
+		if (this->expr != nullptr)
+		{
+			ir::VRegId result_reg = this->expr->emitIr(writer);
+			writer.emit(new ir::instr::ReturnInstruction(result_reg));
+		}
+		else
+		{
+			writer.emit(new ir::instr::ReturnInstruction());
+		}
 	}
 
 	std::optional<std::unique_ptr<ReturnStatement>> ReturnStatement::try_parse(Lexer &lexer)

@@ -1,4 +1,4 @@
 #include "settings.hpp"
 
 unsigned short settings::log_verbosity = 0;
-bool settings::print_ast = false;
+bool settings::debug_print_ast = false;

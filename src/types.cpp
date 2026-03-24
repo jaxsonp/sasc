@@ -5,7 +5,14 @@
 
 #include "utils/error.hpp"
 
-FrontendType::FrontendType(Token tok) : FrontendType(tok.str, tok.loc) {}
+FrontendType::FrontendType()
+	: variant(ConcreteType::VOID) {}
+
+FrontendType::FrontendType(ConcreteType type)
+	: variant(type) {}
+
+FrontendType::FrontendType(Token tok)
+	: FrontendType(tok.str, tok.loc) {}
 
 FrontendType::FrontendType(std::string s, SourceLocRange loc)
 {

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdint>
 
+#include "utils/CliParser.hpp"
 #include "utils/common.hpp"
 #include "utils/logging.hpp"
 #include "utils/error.hpp"
@@ -14,22 +15,29 @@ void compile(const std::string &);
 
 int main(int argc, char **argv)
 {
-	if (argc < 2)
+	CliParser cli("sasc-compiler");
+	auto &filename_arg = cli.add_positional("file", "Input file to compile").required();
+	auto &verbosity_flag = cli.add_flag("verbose", "Increase compiler verbosity").short_name('v').allow_multi();
+	auto &debug_print_ast_flag = cli.add_flag("debug-print-ast", "Print a textual representation of the parsed abstract syntax tree");
+	cli.add_help_flag(exit_code_as_int(ExitCode::Success));
+
+	try
 	{
-		std::cerr << "Usage: sasc-compiler <file>" << std::endl;
-		return 1;
+		cli.parse(argc, argv);
+	}
+	catch (const CliError &ex)
+	{
+		std::cerr << "Error: " << ex.what() << std::endl
+				  << std::endl;
+		cli.print_help();
+		return exit_code_as_int(ExitCode::UncaughtInternalError);
 	}
 
-	for (int i = 2; i < argc; ++i)
-	{
-		// TODO improve this
-		if (!strcmp(argv[i], "-v"))
-			settings::log_verbosity += 1;
-		else if (!strcmp(argv[i], "--print-ast"))
-			settings::print_ast = true;
-	}
+	settings::log_verbosity = verbosity_flag.count();
 	log_vv("verbosity: {}", settings::log_verbosity);
-	log_vv("print ast: {}", bool_str(settings::print_ast));
+
+	settings::debug_print_ast = debug_print_ast_flag.present();
+	log_vv("debug print ast: {}", bool_str(settings::debug_print_ast));
 
 	std::string filename = argv[1];
 	log_v("input file: {:s}", filename.c_str());
@@ -40,14 +48,14 @@ int main(int argc, char **argv)
 		compile(filename);
 		log("{}: compilation complete", filename);
 	}
-	catch (CompileError e)
+	catch (const CompileError &e)
 	{
 		std::cerr << std::endl
 				  << e.what() << std::endl;
 		log("{}: compilation failed", filename);
 		return exit_code_as_int(e.exit_code());
 	}
-	catch (std::exception e)
+	catch (const std::exception &e)
 	{
 		std::cerr << std::endl
 				  << "Uncaught exception occurred: " << e.what() << std::endl;
@@ -71,7 +79,7 @@ void compile(const std::string &filename)
 	log_vv("Parsing AST");
 	AST ast(lexer);
 
-	if (settings::print_ast)
+	if (settings::debug_print_ast)
 	{
 		log_vv("Printing AST");
 		ast.debug_print();

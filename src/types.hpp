@@ -27,8 +27,8 @@ public:
 		bool operator==(const Unknown &other) const = default;
 	};
 
-	FrontendType() : variant(ConcreteType::VOID) {};
-	FrontendType(ConcreteType type) : variant(ConcreteType::VOID) {};
+	FrontendType();
+	FrontendType(ConcreteType type);
 	FrontendType(Token tok);
 	FrontendType(std::string s, SourceLocRange loc);
 

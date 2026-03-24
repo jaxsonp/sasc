@@ -11,6 +11,42 @@ namespace ir
 	using BBlockId = unsigned int;
 	using VRegId = unsigned short;
 
+	/*enum class TypeVariant
+	{
+		U32,
+		I32,
+	};
+
+	struct Type
+	{
+		TypeVariant variant;
+
+		inline static Type u32() { return Type{TypeVariant::U32}; }
+		inline static Type i32() { return Type{TypeVariant::I32}; }
+	};
+
+	enum class ValueVariant
+	{
+		VirtualReg,
+		Immediate,
+	};
+
+	struct Value
+	{
+		ValueVariant variant;
+		Type type;
+		union
+		{
+			/// Used if variant is virtual register
+			int vreg_id;
+			/// Used if variant is immediate
+			int32_t imm_val;
+		} data;
+
+		static Value new_vreg(VRegId id, Type t);
+		static Value new_immediate(int32_t val);
+	};*/
+
 	enum class Op
 	{
 		// arithmetic ---
@@ -50,8 +86,8 @@ namespace ir
 	{
 		Op opcode;
 
-		Instruction *next;
-		Instruction *prev;
+		Instruction *next = nullptr;
+		Instruction *prev = nullptr;
 
 		/// @brief Whether this instruct is a terminal instruction. Defaults to false
 		virtual bool is_terminal() const { return false; }
@@ -75,15 +111,25 @@ namespace ir
 		struct LoadArgInstruction : public Instruction
 		{
 			unsigned short arg_index;
-			VRegId dst;
+			VRegId dest;
+			LoadArgInstruction(VRegId dest, unsigned short index);
+		};
 
-			LoadArgInstruction(VRegId dst, unsigned short index);
+		struct LoadImmInstruction : public Instruction
+		{
+			VRegId dest;
+			int32_t value;
+			LoadImmInstruction(VRegId dest, int32_t val);
 		};
 
 		struct ReturnInstruction : public TerminalInstruction
 		{
-			std::optional<VRegId> ret_value;
+			std::optional<VRegId> ret_value = std::nullopt;
+
+			ReturnInstruction();
 			ReturnInstruction(VRegId ret_value);
+
+			std::vector<BasicBlock *> successors() const override { return std::vector<BasicBlock *>(); }
 		};
 
 		/// @brief Unconditional jump
@@ -91,21 +137,22 @@ namespace ir
 		{
 			BasicBlock *target;
 
-			explicit JumpInstruction(BasicBlock *t)
+			JumpInstruction(BasicBlock *t)
 				: TerminalInstruction(Op::Jump), target(t) {}
 
-			std::vector<BasicBlock *> successors() const override { return {this->target}; }
+			std::vector<BasicBlock *> successors() const override { return std::vector<BasicBlock *>{this->target}; }
 		};
 	}
 
 	/// TODO conditional jump
 
-	struct BasicBlock
+	class BasicBlock
 	{
+	public:
 		const unsigned int id;
-		std::string note;
-		Instruction *start;
-		Instruction *end;
+		std::string note = "";
+		Instruction *start = nullptr;
+		Instruction *end = nullptr;
 
 		BasicBlock(std::string note = "");
 	};
@@ -129,9 +176,9 @@ namespace ir
 
 	struct Function
 	{
-		std::string name;
-		BasicBlock *entry;
-		unsigned short vreg_count;
+		std::string name = "";
+		BasicBlock *entry = nullptr;
+		unsigned short vreg_count = 0;
 
 		Function(const std::string &name);
 	};
@@ -148,9 +195,9 @@ class IrWriter
 	std::vector<VRegMap> vreg_map_scopes;
 
 public:
-	ir::Function *cur_function;
-	ir::BasicBlock *cur_bblock;
-	ir::Instruction *cur_instr;
+	ir::Function *cur_function = nullptr;
+	ir::BasicBlock *cur_bblock = nullptr;
+	ir::Instruction *cur_instr = nullptr;
 
 	IrWriter(std::unordered_map<std::string, ir::Function *> &_functions)
 		: functions(_functions) {}

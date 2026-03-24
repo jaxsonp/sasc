@@ -3,5 +3,5 @@
 namespace settings
 {
 	extern unsigned short log_verbosity;
-	extern bool print_ast;
+	extern bool debug_print_ast;
 }

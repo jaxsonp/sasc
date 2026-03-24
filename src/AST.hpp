@@ -6,6 +6,7 @@
 #include <optional>
 #include <unordered_map>
 #include <memory>
+#include <string>
 
 #include "Lexer.hpp"
 #include "IR.hpp"
@@ -76,7 +77,6 @@ namespace ast
 
 		virtual void check_semantics(SemanticAnalysisState state) const = 0;
 		virtual void debug_print(unsigned int depth) const = 0;
-		virtual void emitIr(IrWriter &writer) const = 0;
 
 		virtual ~Node() = default;
 	};
@@ -86,6 +86,7 @@ namespace ast
 	{
 	public:
 		virtual std::pair<std::string, FrontendType> declares() const = 0;
+		virtual void emitIr(IrWriter &writer) const = 0;
 
 		static std::optional<std::unique_ptr<TopLevelDeclaration>> try_parse(Lexer &lexer);
 	};
@@ -95,6 +96,8 @@ namespace ast
 	{
 	public:
 		static std::optional<std::unique_ptr<ExpressionNode>> try_parse(Lexer &lexer);
+		/// @return ID of output register
+		virtual ir::VRegId emitIr(IrWriter &writer) const = 0;
 
 		virtual FrontendType get_type() const = 0;
 	};
@@ -104,16 +107,17 @@ namespace ast
 	{
 	public:
 		static std::optional<std::unique_ptr<StatementNode>> try_parse(Lexer &lexer);
+		virtual void emitIr(IrWriter &writer) const = 0;
 	};
 
 	struct IntegerLiteralExpression : ExpressionNode
 	{
-		std::string value;
+		int32_t value;
 		FrontendType type;
 
 		void check_semantics(SemanticAnalysisState state) const override;
 		void debug_print(unsigned int depth = 0) const override;
-		void emitIr(IrWriter &writer) const override;
+		ir::VRegId emitIr(IrWriter &writer) const override;
 
 		static std::optional<std::unique_ptr<IntegerLiteralExpression>> try_parse(Lexer &lexer);
 
@@ -157,9 +161,6 @@ namespace ast
 
 		void check_semantics(SemanticAnalysisState state) const override;
 		void debug_print(unsigned int depth = 0) const override;
-		/// @brief nop
-		/// function arg emission handled by function
-		void emitIr(IrWriter &writer) const override {};
 
 		static std::optional<ArgDefinition> try_parse(Lexer &lexer);
 
