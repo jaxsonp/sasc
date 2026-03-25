@@ -2,19 +2,34 @@
 
 #include <chrono>
 
-namespace logging::detail
+namespace logging
 {
-	double init_time = timestamp();
-
-	double timestamp()
+	int global_log_verbosity()
 	{
-		std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-		long long ms_since_epoch = duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-		return ((double)ms_since_epoch) / 1000.0;
+		return detail::log_verbosity;
 	}
-	std::string generate_msg_prefix(unsigned short verbosity)
+
+	void set_global_log_verbosity(int val)
 	{
-		double rel_time = logging::detail::timestamp() - logging::detail::init_time;
-		return std::format("\x1b[90m[{: >6.3f}]\x1b[0m {}", rel_time, std::string(verbosity * 2, ' '));
+		detail::log_verbosity = val;
+	}
+
+	namespace detail
+	{
+		int log_verbosity;
+
+		double init_time = timestamp();
+
+		double timestamp()
+		{
+			std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+			long long ms_since_epoch = duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+			return ((double)ms_since_epoch) / 1000.0;
+		}
+		std::string generate_msg_prefix(int verbosity)
+		{
+			double rel_time = logging::detail::timestamp() - logging::detail::init_time;
+			return std::format("\x1b[90m[{: >6.3f}]\x1b[0m {}", rel_time, std::string(verbosity * 2, ' '));
+		}
 	}
 }

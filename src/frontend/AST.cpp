@@ -29,8 +29,8 @@ AST::AST(std::istream &input)
 	log_vv("Parse successful");
 
 	log_vv("Hoisting top level symbols");
-	this->symbols = new GlobalSymbolTable();
-	SemanticAnalysisState state(this->symbols);
+	this->symbols = new ast::GlobalSymbolTable();
+	ast::SemanticAnalysisState state(this->symbols);
 	// top level hoisting
 	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
 	{
@@ -56,44 +56,42 @@ void AST::debug_print() const
 	}
 }
 
-std::unordered_map<std::string, ir::Function *> AST::emitIr() const
+IrObject *AST::emitIr() const
 {
-	std::unordered_map<std::string, ir::Function *> ret;
-	IrWriter state(ret);
+	IrWriter writer;
 
 	for (const std::unique_ptr<ast::TopLevelDeclaration> &tld : this->tlds)
-		tld->emitIr(state);
+		tld->emitIr(writer);
 
-	return ret;
-}
-
-void SymbolScope::add(std::string name, FrontendType type)
-{
-	if (this->symbols.contains(name))
-		throw NameError(std::format("Name \"{}\" is already defined at this point", name));
-	auto [_, success] = this->symbols.insert({name, Symbol(name, type)});
-	if (!success)
-		throw InternalError(std::format("Failed to insert symbol \"{}\": {}", name, type.to_string()));
-}
-void SymbolScope::add(std::pair<std::string, FrontendType> pair)
-{
-	this->add(pair.first, pair.second);
-}
-
-SymbolScope::SymbolScope(SymbolScope *_parent)
-	: parent(_parent) {}
-
-SemanticAnalysisState::SemanticAnalysisState(GlobalSymbolTable *_symbols)
-	: symbols(_symbols),
-	  cur_scope(_symbols),
-	  fn_return_type(std::nullopt)
-{
-	if (_symbols == nullptr)
-		throw InternalError("Attempted to initialize semantic analysis state with nullptr");
+	return writer.get_obj();
 }
 
 namespace ast
 {
+	void SymbolScope::add(std::string name, FrontendType type)
+	{
+		if (this->symbols.contains(name))
+			throw NameError(std::format("Name \"{}\" is already defined at this point", name));
+		auto [_, success] = this->symbols.insert({name, Symbol(name, type)});
+		if (!success)
+			throw InternalError(std::format("Failed to insert symbol \"{}\": {}", name, type.to_string()));
+	}
+	void SymbolScope::add(std::pair<std::string, FrontendType> pair)
+	{
+		this->add(pair.first, pair.second);
+	}
+
+	SymbolScope::SymbolScope(SymbolScope *_parent)
+		: parent(_parent) {}
+
+	SemanticAnalysisState::SemanticAnalysisState(GlobalSymbolTable *_symbols)
+		: symbols(_symbols),
+		  cur_scope(_symbols),
+		  fn_return_type(std::nullopt)
+	{
+		if (_symbols == nullptr)
+			throw InternalError("Attempted to initialize semantic analysis state with nullptr");
+	}
 	void IntegerLiteralExpression::check_semantics(SemanticAnalysisState state) const
 	{
 	}

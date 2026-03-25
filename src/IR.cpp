@@ -27,7 +27,7 @@ namespace ir
 	Function::Function(const std::string &_name)
 		: name(_name), vreg_count(0)
 	{
-		this->entry = new BasicBlock(this->name + ".entry");
+		this->entry = new BasicBlock(this->name + " start");
 	}
 
 	/*Value Value::new_vreg(VRegId id, Type t)
@@ -46,10 +46,13 @@ namespace ir
 	}*/
 }
 
+IrWriter::IrWriter()
+	: obj(new IrObject()) {}
+
 void IrWriter::new_function(const std::string &name)
 {
 	this->cur_function = new ir::Function(name);
-	this->functions.insert({name, this->cur_function});
+	this->obj->functions.insert({name, this->cur_function});
 
 	this->cur_bblock = this->cur_function->entry;
 
@@ -101,6 +104,7 @@ void IrWriter::emit(ir::Instruction *new_instr)
 	if (this->cur_bblock == nullptr)
 		throw InternalError("Attempted to emit IR instruction before a basic block was \"chosen\"");
 
+	this->cur_function->instr_count += 1;
 	if (this->cur_instr == nullptr)
 	{
 		// bblock is empty

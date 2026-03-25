@@ -180,28 +180,33 @@ namespace ir
 		std::string name = "";
 		BasicBlock *entry = nullptr;
 		unsigned short vreg_count = 0;
+		unsigned long long instr_count = 0;
 
 		Function(const std::string &name);
 	};
 }
 
-/// @brief Wraps a map of functions, for building CFGs
+struct IrObject
+{
+	std::unordered_map<std::string, ir::Function *> functions;
+};
+
+/// @brief Wrapper around logic for building an IrObject. User must claim and clean up resultant object
 class IrWriter
 {
 	using VRegMap = std::unordered_map<std::string, ir::VRegId>;
 
-	std::unordered_map<std::string, ir::Function *> &functions;
-
 	/// @brief A stack of vreg maps, mapping names to assigned virtual registers
 	std::vector<VRegMap> vreg_map_scopes;
+
+	IrObject *obj;
 
 public:
 	ir::Function *cur_function = nullptr;
 	ir::BasicBlock *cur_bblock = nullptr;
 	ir::Instruction *cur_instr = nullptr;
 
-	IrWriter(std::unordered_map<std::string, ir::Function *> &_functions)
-		: functions(_functions) {}
+	IrWriter();
 
 	/// @brief Creates a new function, and sets this writer's context there
 	void new_function(const std::string &name);
@@ -220,4 +225,7 @@ public:
 
 	/// @brief Write an instruction at the current position
 	void emit(ir::Instruction *new_instr);
+
+	/// User must delete object
+	IrObject *get_obj() { return this->obj; }
 };

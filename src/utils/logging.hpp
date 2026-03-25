@@ -3,20 +3,25 @@
 #include <format>
 #include <iostream>
 
-#include "settings.hpp"
-
-namespace logging::detail
+namespace logging
 {
-	extern double init_time;
-	double timestamp();
+	int global_log_verbosity();
+	void set_global_log_verbosity(int val);
 
-	std::string generate_msg_prefix(unsigned short verbosity);
+	namespace detail
+	{
+		extern int log_verbosity;
+		double timestamp();
+
+		std::string generate_msg_prefix(int verbosity);
+
+	}
 }
 
 template <typename... Args>
-void log(unsigned short verbosity, std::format_string<Args...> msg_fmt, Args &&...msg_args)
+void log(int verbosity, std::format_string<Args...> msg_fmt, Args &&...msg_args)
 {
-	if (verbosity > settings::log_verbosity)
+	if (verbosity > logging::detail::log_verbosity)
 		return;
 
 	std::cout << logging::detail::generate_msg_prefix(verbosity) << std::format(msg_fmt, std::forward<Args>(msg_args)...) << std::endl;

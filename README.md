@@ -24,6 +24,10 @@ Eventually:
 - try doing UTF8
 - labelled code blocks (for early breaks)
 - turn of colored output (automatically if not tty perhaps?)
+
+futuer optimizations:
+- Better register allocator
+- Optimize out LUI
   
 ## Notes for self
 

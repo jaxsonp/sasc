@@ -14,61 +14,60 @@
 #include "types.hpp"
 #include "utils/common.hpp"
 
-enum class SymbolType
-{
-	Variable,
-};
-
-struct Symbol
-{
-	std::string name;
-	FrontendType variable_type;
-
-	Symbol(std::string _name, FrontendType _variable_type) : name(_name), variable_type(_variable_type) {}
-};
-
-class SymbolScope
-{
-	std::unordered_map<std::string, Symbol> symbols;
-
-public:
-	/// @brief Parent (if not root)
-	SymbolScope *parent;
-
-	virtual SymbolScope *get_parent() { return this->parent; };
-	virtual inline bool is_root() { return false; };
-
-	// std::optional<Type> find_symbol(const std::string &name, bool recursive = true);
-
-	/// @brief Insert a symbol into this symbol table scope, throwing on collision
-	/// @param name Symbol name
-	/// @param type Symbol type
-	void add(std::string name, FrontendType type);
-	/// @brief Insert a symbol into this symbol table scope, throwing on collision
-	/// @param symbol Name/type pair
-	inline void add(std::pair<std::string, FrontendType> symbol);
-
-	SymbolScope(SymbolScope *parent);
-};
-
-class GlobalSymbolTable : public SymbolScope
-{
-public:
-	virtual inline bool is_root() { return false; };
-	GlobalSymbolTable() : SymbolScope(nullptr) {}
-};
-
-struct SemanticAnalysisState
-{
-	std::optional<FrontendType> fn_return_type;
-	SymbolScope *cur_scope;
-	GlobalSymbolTable *symbols;
-
-	SemanticAnalysisState(GlobalSymbolTable *symbols);
-};
-
 namespace ast
 {
+	enum class SymbolType
+	{
+		Variable,
+	};
+
+	struct Symbol
+	{
+		std::string name;
+		FrontendType variable_type;
+
+		Symbol(std::string _name, FrontendType _variable_type) : name(_name), variable_type(_variable_type) {}
+	};
+
+	class SymbolScope
+	{
+		std::unordered_map<std::string, Symbol> symbols;
+
+	public:
+		/// @brief Parent (if not root)
+		SymbolScope *parent;
+
+		virtual SymbolScope *get_parent() { return this->parent; };
+		virtual inline bool is_root() { return false; };
+
+		// std::optional<Type> find_symbol(const std::string &name, bool recursive = true);
+
+		/// @brief Insert a symbol into this symbol table scope, throwing on collision
+		/// @param name Symbol name
+		/// @param type Symbol type
+		void add(std::string name, FrontendType type);
+		/// @brief Insert a symbol into this symbol table scope, throwing on collision
+		/// @param symbol Name/type pair
+		inline void add(std::pair<std::string, FrontendType> symbol);
+
+		SymbolScope(SymbolScope *parent);
+	};
+
+	class GlobalSymbolTable : public SymbolScope
+	{
+	public:
+		virtual inline bool is_root() { return false; };
+		GlobalSymbolTable() : SymbolScope(nullptr) {}
+	};
+
+	struct SemanticAnalysisState
+	{
+		std::optional<FrontendType> fn_return_type;
+		SymbolScope *cur_scope;
+		GlobalSymbolTable *symbols;
+
+		SemanticAnalysisState(GlobalSymbolTable *symbols);
+	};
 
 	// Node interface
 	class Node
@@ -195,14 +194,14 @@ namespace ast
 class AST
 {
 	std::vector<std::unique_ptr<ast::TopLevelDeclaration>> tlds;
-	GlobalSymbolTable *symbols;
+	ast::GlobalSymbolTable *symbols;
 
 public:
 	/// attempt to create an AST from input stream
 	AST(std::istream &input);
 
 	void debug_print() const;
-	std::unordered_map<std::string, ir::Function *> emitIr() const;
+	IrObject *emitIr() const;
 
 	// no need to delete symbol tables here, they are owned and will be deleted by AST nodes
 	~AST() = default;
