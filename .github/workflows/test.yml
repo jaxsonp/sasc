@@ -7,23 +7,51 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.14'
+      uses: actions/checkout@v5
 
     - name: Configure CMake
       run: cmake -S . -B build
 
     - name: Build
       run: cmake --build build
+
+    # must tar to preserve build file permissions
+    - name: Tar build files
+      run: tar -cvf build-output.tar build/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        path: build-output.tar
+        archive: false
+        if-no-files-found: error
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.14'
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v8
+      with:
+        name: build-output.tar
+        # auto decompresses
+
+    - name: Unpack build output
+      run: tar -xvf build-output.tar
 
     - name: Run Tests
       run: python testing/run_tests.py build/sasc-compiler
